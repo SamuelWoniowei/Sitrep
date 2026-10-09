@@ -123,3 +123,10 @@ News comes from BleepingComputer, The Record, The Hacker News, the UK NCSC, the 
 ## License
 
 [MIT](LICENSE) © 2026 Samuel Woniowei
+
+## v0.3.0 additions
+
+- Separate pages for **Developing** (day-by-day timelines with "new since you read"), **Threat actors** (what they want, how they operate), **Am I affected?**, **Lab pack** (weekly) and **Sunday Sitrep**.
+- **Watchlist board** with 30-day counts and a 14-day sparkline per term; **Systems** page; "LIVE · N SOURCES" indicator; greeting by name (Settings → You); 16-week reading calendar.
+- "How the attack worked" strip on each story (estimated from the story's own words).
+- All new data is computed locally from the stored stories; no new network access.

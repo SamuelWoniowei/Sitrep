@@ -645,6 +645,70 @@ pub fn get_actors(state: State<'_, AppState>) -> Res<Vec<intel::ActorSeen>> {
     Ok(intel::actors_seen(&*lock(&state)?, now() - 14 * 86_400))
 }
 
+#[tauri::command]
+pub fn get_developing(state: State<'_, AppState>) -> Res<Vec<intel::Cluster>> {
+    let s = lock(&state)?;
+    let read = s.all_read_ids().map_err(|e| e.to_string())?;
+    Ok(intel::clusters(&s, &read, now() - 21 * 86_400))
+}
+
+#[tauri::command]
+pub fn get_watch_board(state: State<'_, AppState>) -> Res<Vec<intel::WatchRow>> {
+    let s = lock(&state)?;
+    let terms = s.watchlist().map_err(|e| e.to_string())?;
+    Ok(intel::watch_board(&s, &terms, now()))
+}
+
+#[tauri::command]
+pub fn get_week_stories(state: State<'_, AppState>) -> Res<Vec<intel::WeekStory>> {
+    Ok(intel::week_stories(&*lock(&state)?, now()))
+}
+
+#[tauri::command]
+pub fn get_name(state: State<'_, AppState>) -> Res<String> {
+    Ok(lock(&state)?.setting("display_name").unwrap_or_default())
+}
+
+#[tauri::command]
+pub fn set_name(state: State<'_, AppState>, name: String) -> Res<String> {
+    let n = name.trim().to_string();
+    if n.chars().count() > 30
+        || !n
+            .chars()
+            .all(|c| c.is_alphabetic() || " -'.".contains(c))
+    {
+        return Err("Use up to 30 letters.".into());
+    }
+    lock(&state)?
+        .set_setting("display_name", &n)
+        .map_err(|e| e.to_string())?;
+    Ok(n)
+}
+
+#[derive(Serialize)]
+pub struct Systems {
+    pub stories: i64,
+    pub kev: i64,
+    pub reads: i64,
+    pub oldest: i64,
+    pub last_sync: i64,
+    pub sources: usize,
+}
+
+#[tauri::command]
+pub fn get_systems(state: State<'_, AppState>) -> Res<Systems> {
+    let s = lock(&state)?;
+    let (stories, kev, reads, oldest) = s.counts().map_err(|e| e.to_string())?;
+    Ok(Systems {
+        stories,
+        kev,
+        reads,
+        oldest,
+        last_sync: s.setting("last_sync").and_then(|v| v.parse().ok()).unwrap_or(0),
+        sources: SOURCES.len(),
+    })
+}
+
 #[derive(Serialize)]
 pub struct ExposureResult {
     pub supported: bool,

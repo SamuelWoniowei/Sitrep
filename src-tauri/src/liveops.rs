@@ -243,11 +243,11 @@ pub fn cve_tracker(store: &Store, now: i64) -> Vec<CveTrack> {
 
 // ---------------- reading calendar ----------------
 
-/// Day keys (YYYY-MM-DD) read in the last 12 weeks, oldest first.
+/// Day keys (YYYY-MM-DD) read in the last 16 weeks, oldest first.
 pub fn read_calendar(store: &Store, now: i64) -> Vec<String> {
     let today = Local.timestamp_opt(now, 0).single().map(|d| d.date_naive());
     let Some(today) = today else { return vec![] };
-    let from = today - Duration::days(83);
+    let from = today - Duration::days(111);
     let mut v: Vec<String> = store
         .read_days()
         .unwrap_or_default()

@@ -9,6 +9,41 @@ const TAG: Record<Story['category'], string> = {
 }
 
 // Splits the summary into up to four steps and lights them one after another.
+const STAGES: { label: string; words: RegExp }[] = [
+  { label: 'Get in', words: /phish|exploit|vulnerab|zero-day|credential|stolen|brute|vpn|rdp|supply.chain|malicious|compromis|breach/i },
+  { label: 'Run code', words: /execut|malware|payload|script|powershell|loader|backdoor|trojan|install|remote code/i },
+  { label: 'Stay hidden', words: /persist|implant|escalat|privilege|evad|disable|hidden|stealth/i },
+  { label: 'Spread', words: /lateral|spread|move[sd]? (?:to|across|through)|domain controller|active directory|pivot|worm/i },
+  { label: 'Cause harm', words: /ransom|encrypt|exfiltrat|steal|leak|wiper|destroy|extort|outage|data theft|disrupt/i },
+]
+
+/** A rough attack chain, lit up from words in the story. Not a full incident report. */
+function AttackFlow({ story }: { story: Story }) {
+  const text = [story.headline, story.tldr, story.why, story.gist, story.plain, story.deeper].join(' ')
+  const hits = STAGES.map((s) => s.words.test(text))
+  if (hits.filter(Boolean).length < 2) return null
+  let n = 0
+  return (
+    <div className="deeper">
+      <div className="label">HOW THE ATTACK WORKED</div>
+      <ol className="flow" aria-label="Attack stages found in this story">
+        {STAGES.map((st, i) => {
+          const on = hits[i]
+          const delay = on ? n++ * 0.6 : 0
+          return (
+            <li key={st.label} className={`flow-step ${on ? 'flow-on' : ''}`} style={{ animationDelay: `${delay}s` }}>
+              <span className="flow-dot" />
+              <span className="small">{st.label}</span>
+              <span className="tiny muted">{on ? 'in this story' : 'not mentioned'}</span>
+            </li>
+          )
+        })}
+      </ol>
+      <p className="tiny muted">Estimated from the words in the story, so it is a guide, not a full account of the attack.</p>
+    </div>
+  )
+}
+
 function Storyboard({ text }: { text: string }) {
   const steps = (text.match(/[^.!?]+[.!?]+/g) ?? [text]).map((x) => x.trim()).filter(Boolean).slice(0, 4)
   if (steps.length < 2) return null
@@ -142,6 +177,7 @@ export function StoryCard({ story, index, open, deeper, aiReady, hasNext, onOpen
               {story.cves.length > 0 && <p className="mono small">{story.cves.join(' · ')}</p>}
             </div>
           )}
+          {deeper && <AttackFlow story={story} />}
           {story.terms.length > 0 && (
             <div className="chips">
               <span className="muted small">Terms:</span>
