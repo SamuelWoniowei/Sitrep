@@ -79,7 +79,7 @@ jobs:
         run: cargo test
       - name: Build installer
         run: npx tauri build
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: sitrep-windows-installer
           path: |
