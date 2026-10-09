@@ -54,6 +54,26 @@ function Stage({ on, label, sub }: { on: boolean; label: string; sub?: string })
   )
 }
 
+// Patch Tuesday is the second Tuesday of each month.
+function nextPatchTuesday(from: Date): { date: Date; days: number } {
+  for (let m = 0; m < 3; m++) {
+    const first = new Date(from.getFullYear(), from.getMonth() + m, 1)
+    const offset = (2 - first.getDay() + 7) % 7
+    const d = new Date(first.getFullYear(), first.getMonth(), 1 + offset + 7)
+    if (d.getTime() >= new Date(from.getFullYear(), from.getMonth(), from.getDate()).getTime()) {
+      return { date: d, days: Math.round((d.getTime() - new Date(from.getFullYear(), from.getMonth(), from.getDate()).getTime()) / 86400000) }
+    }
+  }
+  return { date: from, days: 0 }
+}
+
+// A simple, honest gauge: how many exploited flaws CISA added in the last 7 days.
+function temperature(n: number): { label: string; cls: string } {
+  if (n >= 12) return { label: 'HIGH', cls: 'red' }
+  if (n >= 4) return { label: 'ELEVATED', cls: 'amber' }
+  return { label: 'CALM', cls: 'accent' }
+}
+
 export function LiveOpsPage({ onOpenStory }: { onOpenStory: () => void }) {
   const [d, setD] = useState<LiveOps | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -63,9 +83,19 @@ export function LiveOpsPage({ onOpenStory }: { onOpenStory: () => void }) {
   if (!d) return <div className="muted">Loading…</div>
   const node = d.map.nodes.find((n) => n.id === sel) ?? null
   return (
-    <section className="panel page">
+    <section className="panel page page-wide">
       <h1 className="h1">Live ops</h1>
       <div className="tiles">
+        <div className="tile" title="Based on how many exploited flaws CISA added in the last 7 days: under 4 calm, 4 to 11 elevated, 12 or more high.">
+          <div className="mono tiny muted">THREAT TEMPERATURE</div>
+          <div className={`tile-n ${temperature(d.exploited_14d).cls}`}>{temperature(d.exploited_14d).label}</div>
+        </div>
+        <div className="tile">
+          <div className="mono tiny muted">NEXT PATCH TUESDAY</div>
+          <div className="tile-n">{nextPatchTuesday(new Date()).days === 0 ? 'Today' : `${nextPatchTuesday(new Date()).days} days`}</div>
+          <div className="tiny muted">{nextPatchTuesday(new Date()).date.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' })}</div>
+        </div>
+        <div className="tile"><div className="mono tiny muted">SOURCES</div><div className="tile-n">{d.sources}</div></div>
         <div className="tile"><div className="mono tiny muted">STREAK</div><div className="tile-n accent">{d.streak}</div></div>
         <div className="tile"><div className="mono tiny muted">EXPLOITED FLAWS ADDED (7D)</div><div className="tile-n red">{d.exploited_14d}</div></div>
         <div className="tile"><div className="mono tiny muted">NEW STORIES TODAY</div><div className="tile-n">{d.new_today}</div></div>

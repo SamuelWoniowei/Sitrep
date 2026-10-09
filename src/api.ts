@@ -111,6 +111,7 @@ export interface LiveOps {
   streak: number
   exploited_14d: number
   new_today: number
+  sources: number
 }
 
 export interface Recap {

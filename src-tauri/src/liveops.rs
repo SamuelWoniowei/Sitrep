@@ -271,6 +271,7 @@ pub struct LiveOps {
     pub streak: i64,
     pub exploited_14d: i64,
     pub new_today: i64,
+    pub sources: usize,
 }
 
 #[cfg(test)]

@@ -34,6 +34,16 @@ export function pickLocalVoice<T extends VoiceLike>(voices: T[]): T | null {
 let ctx: AudioContext | null = null
 let source: AudioBufferSourceNode | null = null
 
+/** Call straight from a click: browsers only allow audio after a user action. */
+export function unlockAudio(sampleRate = 22050): void {
+  try {
+    ctx = ctx ?? new AudioContext({ sampleRate })
+    void ctx.resume()
+  } catch {
+    /* no audio device: reported when playback is attempted */
+  }
+}
+
 /** Convert raw 16-bit little-endian mono PCM to floats in [-1, 1]. */
 export function pcmToFloat(buf: ArrayBuffer): Float32Array {
   const n = Math.floor(buf.byteLength / 2)
@@ -46,7 +56,10 @@ export function pcmToFloat(buf: ArrayBuffer): Float32Array {
 export async function speakWithPiper(parts: string[], sampleRate: number, onEnd: () => void): Promise<void> {
   const pcm = await api.speakPiper(parts)
   const data = pcmToFloat(pcm)
+  if (data.length < 1000) throw 'The voice engine returned no audio.'
   ctx = ctx ?? new AudioContext({ sampleRate })
+  await ctx.resume()
+  if (ctx.state !== 'running') throw 'Windows blocked audio playback. Click Listen again.'
   const buffer = ctx.createBuffer(1, data.length, sampleRate)
   buffer.copyToChannel(data as Float32Array<ArrayBuffer>, 0)
   stopPiper()
@@ -65,20 +78,32 @@ function stopPiper(): void {
   }
 }
 
-/** Returns false when no private voice is available. */
-export function speakSystem(parts: string[], onEnd: () => void): boolean {
-  if (!canListen()) return false
-  const voice = pickLocalVoice(window.speechSynthesis.getVoices())
-  if (!voice) return false
+/** Windows loads its voice list a moment after start, so wait briefly for it. */
+function voicesReady(): Promise<SpeechSynthesisVoice[]> {
+  const now = window.speechSynthesis.getVoices()
+  if (now.length) return Promise.resolve(now)
+  return new Promise((resolve) => {
+    const done = () => resolve(window.speechSynthesis.getVoices())
+    window.speechSynthesis.addEventListener('voiceschanged', done, { once: true })
+    window.setTimeout(done, 1500)
+  })
+}
+
+/** Returns the voice name used, or null when no private voice is available. */
+export async function speakSystem(parts: string[], onEnd: () => void): Promise<string | null> {
+  if (!canListen()) return null
+  const voice = pickLocalVoice(await voicesReady())
+  if (!voice) return null
   window.speechSynthesis.cancel()
   parts.forEach((text, i) => {
     const u = new SpeechSynthesisUtterance(text)
-    u.voice = voice as SpeechSynthesisVoice
+    u.voice = voice
     u.lang = voice.lang
     if (i === parts.length - 1) u.onend = onEnd
+    u.onerror = onEnd
     window.speechSynthesis.speak(u)
   })
-  return true
+  return voice.name
 }
 
 export function stopSpeaking(): void {
@@ -86,16 +111,24 @@ export function stopSpeaking(): void {
   if (canListen()) window.speechSynthesis.cancel()
 }
 
-/** Read lines aloud with the best private voice available. Resolves false if none. */
-export async function playParts(parts: string[], onEnd: () => void): Promise<boolean> {
+export interface PlayResult { ok: boolean; message: string }
+
+/** Read lines aloud with the best private voice available, and say what happened. */
+export async function playParts(parts: string[], onEnd: () => void): Promise<PlayResult> {
+  let piperProblem = ''
   try {
     const v = await api.voiceStatus()
     if (v.installed) {
       await speakWithPiper(parts, v.sample_rate, onEnd)
-      return true
+      return { ok: true, message: 'Playing with the natural voice (Alan).' }
     }
-  } catch {
-    // fall through to an on-device system voice
+  } catch (e) {
+    piperProblem = typeof e === 'string' ? e : 'The natural voice could not play.'
   }
-  return speakSystem(parts, onEnd)
+  const name = await speakSystem(parts, onEnd)
+  if (name) return { ok: true, message: `${piperProblem ? piperProblem + ' ' : ''}Playing with the built-in voice: ${name}.` }
+  return {
+    ok: false,
+    message: piperProblem || 'No private voice found. Install the natural voice in Settings → Voice.',
+  }
 }

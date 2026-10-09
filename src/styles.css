@@ -221,3 +221,9 @@ select { background: var(--chrome); border: 1px solid var(--field); border-radiu
   *, *::before, *::after { animation: none !important; transition: none !important; }
   .board-step { opacity: 1; }
 }
+
+/* Live Ops uses the full window width. */
+.page-wide { max-width: none; }
+.page-wide .globe-row { grid-template-columns: minmax(360px, 700px) minmax(240px, 1fr); }
+.page-wide .globe { max-height: 78vh; }
+.page-wide .tiles { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }

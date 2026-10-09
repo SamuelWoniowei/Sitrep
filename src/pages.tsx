@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { playParts } from './listen'
+import { playParts, unlockAudio } from './listen'
 import { animationsOn, setAnimations } from './prefs'
 import { api, errText, type AiStatus, type UpdateInfo, type BuiltItem, type Idea, type Project, type RadarRow, type Recap, type GlossEntry, type ActorSeen, type ExposureResult, type VoiceStatus } from './api'
 
@@ -134,7 +134,7 @@ export function RecapPage() {
       <button
         type="button"
         className="btn"
-        onClick={() => { void playParts([`Your week in security. ${r.story_count} stories.`, ...r.themes.map((t) => `${t.theme}: ${t.count} stories. ${t.examples.slice(0, 2).join('. ')}`)], () => {}) }}
+        onClick={() => { unlockAudio(); void playParts([`Your week in security. ${r.story_count} stories.`, ...r.themes.map((t) => `${t.theme}: ${t.count} stories. ${t.examples.slice(0, 2).join('. ')}`)], () => {}) }}
       >
         ▶ Listen to the recap
       </button>
