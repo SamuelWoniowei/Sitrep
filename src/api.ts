@@ -100,7 +100,7 @@ export interface Today {
 
 export interface LiveOps {
   map: {
-    nodes: { iso: string; name: string; lat: number; lon: number; count: number; stories: [string, string][] }[]
+    nodes: { id: string; name: string; lat: number; lon: number; count: number; stories: [string, string][] }[]
     arcs: { actor: string; from: string; to: string; count: number }[]
     edges: { actor: string; cve: string }[]
     stories_considered: number

@@ -61,7 +61,7 @@ export default function App() {
     if (!data || enhancing.current) return
     enhancing.current = true
     try {
-      for (const s of data.stories.filter((x) => !x.ai)) {
+      for (const s of data.stories.filter((x) => !x.ai || !x.gist)) {
         try {
           const card = await api.enhance(s.id)
           setToday((t) => (t ? { ...t, stories: t.stories.map((x) => (x.id === card.id ? card : x)) } : t))

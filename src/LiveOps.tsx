@@ -61,7 +61,7 @@ export function LiveOpsPage({ onOpenStory }: { onOpenStory: () => void }) {
   useEffect(() => { api.liveops().then(setD).catch((e) => setErr(errText(e))) }, [])
   if (err) return <div className="error">{err}</div>
   if (!d) return <div className="muted">Loading…</div>
-  const node = d.map.nodes.find((n) => n.iso === sel) ?? null
+  const node = d.map.nodes.find((n) => n.id === sel) ?? null
   return (
     <section className="panel page">
       <h1 className="h1">Live ops</h1>
@@ -88,8 +88,8 @@ export function LiveOpsPage({ onOpenStory }: { onOpenStory: () => void }) {
             <>
               <h3 className="h3">Most named</h3>
               <ul className="small plain-list">
-                {d.map.nodes.slice(0, 8).map((n) => (
-                  <li key={n.iso}><button type="button" className="linkish" onClick={() => setSel(n.iso)}>{n.name}</button> <span className="muted">· {n.count}</span></li>
+                {d.map.nodes.slice(0, 12).map((n) => (
+                  <li key={n.id}><button type="button" className="linkish" onClick={() => setSel(n.id)}>{n.name}</button> <span className="muted">· {n.count}</span></li>
                 ))}
               </ul>
               {d.map.nodes.length === 0 && <p className="small muted">No countries named yet. Refresh to load stories.</p>}

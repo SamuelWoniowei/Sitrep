@@ -12,144 +12,68 @@ use crate::intel::{actors_in, ACTORS};
 use crate::store::Store;
 use crate::text::to_plain;
 
-pub struct Country {
-    pub iso: &'static str,
-    pub name: &'static str,
-    pub lat: f64,
-    pub lon: f64,
-    pub aliases: &'static [&'static str],
+pub use crate::countries::{Country, COUNTRIES};
+
+pub fn country(id: &str) -> Option<&'static Country> {
+    COUNTRIES.iter().find(|c| c.id == id)
 }
 
-macro_rules! c {
-    ($iso:expr, $name:expr, $lat:expr, $lon:expr, [$($a:expr),*]) => {
-        Country { iso: $iso, name: $name, lat: $lat, lon: $lon, aliases: &[$($a),*] }
-    };
+fn is_word_edge(text: &str, start: usize, end: usize) -> bool {
+    let before = text[..start].chars().next_back().unwrap_or(' ');
+    let after = text[end..].chars().next().unwrap_or(' ');
+    !before.is_alphanumeric() && !after.is_alphanumeric()
 }
 
-pub const COUNTRIES: &[Country] = &[
-    c!(
-        "US",
-        "United States",
-        39.8,
-        -98.6,
-        ["united states", "u.s.", "usa", "america"]
-    ),
-    c!(
-        "GB",
-        "United Kingdom",
-        54.0,
-        -2.0,
-        [
-            "united kingdom",
-            "uk",
-            "britain",
-            "england",
-            "scotland",
-            "wales"
-        ]
-    ),
-    c!(
-        "RU",
-        "Russia",
-        61.5,
-        105.0,
-        ["russia", "russian federation"]
-    ),
-    c!("CN", "China", 35.0, 103.0, ["china"]),
-    c!("KP", "North Korea", 40.0, 127.0, ["north korea", "dprk"]),
-    c!("KR", "South Korea", 36.5, 127.8, ["south korea"]),
-    c!("IR", "Iran", 32.4, 53.7, ["iran"]),
-    c!("IL", "Israel", 31.0, 34.9, ["israel"]),
-    c!("UA", "Ukraine", 48.4, 31.2, ["ukraine"]),
-    c!("PL", "Poland", 52.0, 19.0, ["poland"]),
-    c!("DE", "Germany", 51.0, 10.5, ["germany"]),
-    c!("FR", "France", 46.6, 2.2, ["france"]),
-    c!("IT", "Italy", 42.8, 12.8, ["italy"]),
-    c!("ES", "Spain", 40.2, -3.7, ["spain"]),
-    c!("NL", "Netherlands", 52.2, 5.3, ["netherlands", "dutch"]),
-    c!("BE", "Belgium", 50.6, 4.7, ["belgium"]),
-    c!("SE", "Sweden", 62.0, 15.0, ["sweden"]),
-    c!("NO", "Norway", 61.0, 8.5, ["norway"]),
-    c!("FI", "Finland", 64.0, 26.0, ["finland"]),
-    c!("DK", "Denmark", 56.0, 10.0, ["denmark"]),
-    c!("IE", "Ireland", 53.2, -8.0, ["ireland"]),
-    c!("CH", "Switzerland", 46.8, 8.2, ["switzerland"]),
-    c!("AT", "Austria", 47.6, 14.1, ["austria"]),
-    c!("CZ", "Czechia", 49.8, 15.5, ["czech republic", "czechia"]),
-    c!("RO", "Romania", 45.9, 25.0, ["romania"]),
-    c!("GR", "Greece", 39.0, 22.0, ["greece"]),
-    c!("PT", "Portugal", 39.5, -8.0, ["portugal"]),
-    c!("HU", "Hungary", 47.2, 19.5, ["hungary"]),
-    c!("BY", "Belarus", 53.7, 28.0, ["belarus"]),
-    c!("TR", "Turkey", 39.0, 35.0, ["turkey", "türkiye"]),
-    c!("IN", "India", 21.0, 78.0, ["india"]),
-    c!("PK", "Pakistan", 30.0, 70.0, ["pakistan"]),
-    c!("JP", "Japan", 36.0, 138.0, ["japan"]),
-    c!("TW", "Taiwan", 23.7, 121.0, ["taiwan"]),
-    c!("SG", "Singapore", 1.35, 103.8, ["singapore"]),
-    c!("HK", "Hong Kong", 22.3, 114.2, ["hong kong"]),
-    c!("AU", "Australia", -25.0, 134.0, ["australia"]),
-    c!("NZ", "New Zealand", -41.0, 174.0, ["new zealand"]),
-    c!("CA", "Canada", 56.0, -106.0, ["canada"]),
-    c!("MX", "Mexico", 23.6, -102.5, ["mexico"]),
-    c!("BR", "Brazil", -10.0, -52.0, ["brazil"]),
-    c!("AR", "Argentina", -34.0, -64.0, ["argentina"]),
-    c!("CO", "Colombia", 4.6, -74.1, ["colombia"]),
-    c!("NG", "Nigeria", 9.1, 8.7, ["nigeria"]),
-    c!("ZA", "South Africa", -29.0, 24.0, ["south africa"]),
-    c!("EG", "Egypt", 26.8, 30.8, ["egypt"]),
-    c!("KE", "Kenya", 0.0, 37.9, ["kenya"]),
-    c!("SA", "Saudi Arabia", 24.0, 45.0, ["saudi arabia"]),
-    c!(
-        "AE",
-        "United Arab Emirates",
-        24.0,
-        54.0,
-        ["united arab emirates", "uae"]
-    ),
-    c!("QA", "Qatar", 25.3, 51.2, ["qatar"]),
-    c!("IQ", "Iraq", 33.0, 44.0, ["iraq"]),
-    c!("SY", "Syria", 35.0, 38.0, ["syria"]),
-    c!("LB", "Lebanon", 33.9, 35.9, ["lebanon"]),
-    c!("VN", "Vietnam", 16.0, 107.8, ["vietnam"]),
-    c!("TH", "Thailand", 15.0, 101.0, ["thailand"]),
-    c!("ID", "Indonesia", -2.5, 118.0, ["indonesia"]),
-    c!("PH", "Philippines", 12.9, 122.0, ["philippines"]),
-    c!("MY", "Malaysia", 4.2, 102.0, ["malaysia"]),
-    c!("KZ", "Kazakhstan", 48.0, 67.0, ["kazakhstan"]),
-];
-
-pub fn country(iso: &str) -> Option<&'static Country> {
-    COUNTRIES.iter().find(|c| c.iso == iso)
-}
-
-fn contains_word(hay: &str, needle: &str) -> bool {
-    let mut start = 0;
-    while let Some(i) = hay[start..].find(needle) {
-        let s = start + i;
+/// Find the first whole-word occurrence of `needle` and blank it out, so a
+/// shorter name inside a longer one ("Guinea" in "Papua New Guinea") is not
+/// counted twice.
+fn take_word(text: &mut String, needle: &str) -> bool {
+    let mut from = 0;
+    while let Some(i) = text[from..].find(needle) {
+        let s = from + i;
         let e = s + needle.len();
-        let before = hay[..s].chars().next_back().unwrap_or(' ');
-        let after = hay[e..].chars().next().unwrap_or(' ');
-        // "u.s." ends in punctuation, so only check word edges that are letters.
-        if !before.is_alphanumeric() && !after.is_alphanumeric() {
+        if is_word_edge(text, s, e) {
+            text.replace_range(s..e, &" ".repeat(e - s));
             return true;
         }
-        start = e;
+        from = e;
     }
     false
 }
 
+/// Countries named in a piece of text (names, common short forms and
+/// demonyms such as "Chinese"). Longest names are matched first.
 pub fn countries_in(text: &str) -> Vec<&'static Country> {
-    let t = format!(" {} ", text.to_lowercase());
-    COUNTRIES
+    let mut lower = format!(" {} ", text.to_lowercase());
+    let mut cased = format!(" {text} ");
+    let mut names: Vec<(&'static str, &'static Country)> = COUNTRIES
         .iter()
-        .filter(|c| c.aliases.iter().any(|a| contains_word(&t, a)))
-        .collect()
+        .flat_map(|c| c.aliases.iter().map(move |a| (*a, c)))
+        .collect();
+    names.sort_by_key(|(a, _)| std::cmp::Reverse(a.len()));
+    let mut found: Vec<&'static Country> = Vec::new();
+    for (alias, c) in names {
+        if found.iter().any(|f| f.id == c.id) {
+            continue;
+        }
+        let hit = if c.ambiguous {
+            // Chad, Jordan, Georgia: only the capitalised form counts.
+            let cap = format!("{}{}", alias[..1].to_uppercase(), &alias[1..]);
+            take_word(&mut cased, &cap)
+        } else {
+            take_word(&mut lower, alias)
+        };
+        if hit {
+            found.push(c);
+        }
+    }
+    found.sort_by_key(|c| c.id);
+    found
 }
 
 #[derive(Serialize, Debug, Clone)]
 pub struct MapNode {
-    pub iso: &'static str,
+    pub id: &'static str,
     pub name: &'static str,
     pub lat: f64,
     pub lon: f64,
@@ -188,8 +112,8 @@ pub fn build_map(store: &Store, since: i64) -> MapData {
         let text = format!("{} {}", s.title, s.summary);
         let cs = countries_in(&text);
         for c in &cs {
-            let n = nodes.entry(c.iso).or_insert_with(|| MapNode {
-                iso: c.iso,
+            let n = nodes.entry(c.id).or_insert_with(|| MapNode {
+                id: c.id,
                 name: c.name,
                 lat: c.lat,
                 lon: c.lon,
@@ -219,12 +143,12 @@ pub fn build_map(store: &Store, since: i64) -> MapData {
                 .find(|x| x.name == a.name)
                 .and_then(|x| country(x.country))
             {
-                for c in cs.iter().filter(|c| c.iso != origin.iso) {
-                    *arcs.entry((a.name, origin.iso, c.iso)).or_default() += 1;
+                for c in cs.iter().filter(|c| c.id != origin.id) {
+                    *arcs.entry((a.name, origin.id, c.id)).or_default() += 1;
                 }
                 // The origin country is always on the map when its actor is named.
-                nodes.entry(origin.iso).or_insert_with(|| MapNode {
-                    iso: origin.iso,
+                nodes.entry(origin.id).or_insert_with(|| MapNode {
+                    id: origin.id,
                     name: origin.name,
                     lat: origin.lat,
                     lon: origin.lon,
@@ -359,24 +283,71 @@ mod tests {
         let c = countries_in(
             "The UK and the U.S. warned that China-linked hackers hit Hong Kong and Turkey",
         );
-        let isos: Vec<_> = c.iter().map(|c| c.iso).collect();
-        for want in ["US", "GB", "CN", "HK", "TR"] {
-            assert!(isos.contains(&want), "{want} in {isos:?}");
+        let ids: Vec<_> = c.iter().map(|c| c.id).collect();
+        for want in [
+            "United States of America",
+            "United Kingdom",
+            "China",
+            "Hong Kong",
+            "Turkey",
+        ] {
+            assert!(ids.contains(&want), "{want} in {ids:?}");
         }
         assert!(
             countries_in("Ukraine and Iranian drones; a skuk of mexicans")
                 .iter()
-                .all(|c| c.iso != "GB")
+                .all(|c| c.id != "United Kingdom")
         );
         assert!(countries_in("indiana jones").is_empty());
     }
 
     #[test]
-    fn country_table_is_sane() {
+    fn demonyms_and_long_names_win() {
+        let ids = |t: &str| countries_in(t).iter().map(|c| c.id).collect::<Vec<_>>();
+        assert_eq!(ids("Chinese and Russian hackers"), vec!["China", "Russia"]);
+        // "Guinea" inside a longer name must not add Guinea
+        let p = ids("A breach in Papua New Guinea");
+        assert_eq!(p, vec!["Papua New Guinea"]);
+        assert!(
+            ids("Niger and Nigeria").contains(&"Niger")
+                && ids("Niger and Nigeria").contains(&"Nigeria")
+        );
+        assert_eq!(
+            ids("flaw in the Democratic Republic of the Congo"),
+            vec!["Dem. Rep. Congo"]
+        );
+    }
+
+    #[test]
+    fn ambiguous_names_need_capitals() {
+        let ids = |t: &str| countries_in(t).iter().map(|c| c.id).collect::<Vec<_>>();
+        assert!(ids("attack in Chad last week").contains(&"Chad"));
+        assert!(ids("the chad meme").is_empty());
+        assert!(ids("Jordan said").contains(&"Jordan"));
+    }
+
+    #[test]
+    fn country_table_covers_the_world() {
         let mut seen = std::collections::HashSet::new();
         for c in COUNTRIES {
-            assert!(seen.insert(c.iso), "dup {}", c.iso);
+            assert!(seen.insert(c.id), "dup {}", c.id);
             assert!((-90.0..=90.0).contains(&c.lat) && (-180.0..=180.0).contains(&c.lon));
+            assert!(!c.aliases.is_empty());
+        }
+        assert!(COUNTRIES.len() > 200);
+        for must in [
+            "Brazil",
+            "India",
+            "Nigeria",
+            "Australia",
+            "Japan",
+            "Egypt",
+            "Singapore",
+            "Argentina",
+            "Kenya",
+            "Canada",
+        ] {
+            assert!(country(must).is_some(), "{must}");
         }
         for a in ACTORS.iter().filter(|a| !a.country.is_empty()) {
             assert!(country(a.country).is_some(), "{}", a.name);
@@ -404,9 +375,9 @@ mod tests {
         assert!(m
             .arcs
             .iter()
-            .any(|a| a.actor == "APT28" && a.from == "RU" && a.to == "PL"));
-        assert!(m.arcs.iter().all(|a| a.to != "RU"));
-        assert!(m.nodes.iter().any(|n| n.iso == "RU"));
+            .any(|a| a.actor == "APT28" && a.from == "Russia" && a.to == "Poland"));
+        assert!(m.arcs.iter().all(|a| a.to != "Russia"));
+        assert!(m.nodes.iter().any(|n| n.id == "Russia"));
         assert_eq!(m.edges.len(), 1);
     }
 
