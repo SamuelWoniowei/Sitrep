@@ -6,7 +6,7 @@ This is what was tested before the first public release (v0.1.0, October 2026) a
 
 | Check | Tool | Result |
 |---|---|---|
-| Backend unit and attack tests | `cargo test` | 50 passed |
+| Backend unit and attack tests | `cargo test` | 56 passed |
 | UI tests (XSS rendering, code guardrails) | `vitest` | 7 passed |
 | Rust lints, warnings as errors | `cargo clippy --all-targets -D warnings` | Clean |
 | Known-vulnerable Rust crates | `cargo audit` (RustSec, 1,295 advisories) | 0 vulnerabilities. 2 warnings, Linux-only (see below) |
@@ -38,6 +38,14 @@ This is what was tested before the first public release (v0.1.0, October 2026) a
 - Plain HTTP: the feed client refuses it.
 - Redirect to another host: the AI client never follows it.
 - Source not on the allowlist, lookalike hosts (`bleepingcomputer.com.evil.example`), non-443 ports: refused.
+
+**Full-article fetch** (`net.rs`, `text.rs`)
+- Only the five exact article hosts are allowed; HTTP, lookalike domains (`therecord.media.evil.example`, `evil-therecord.media`), other ports, credentials, the feed CDN, other government sites and IP addresses are refused.
+- Non-allowlisted URLs and `javascript:` are rejected before any connection.
+- Extraction keeps article paragraphs and drops `<script>`, `<style>`, inline event handlers, header, nav, footer and short boilerplate; output is capped at 6,000 characters.
+
+**Cloud models** (`ai.rs`)
+- `gemma4:cloud`, `gpt-oss:120b-cloud`, mixed-case variants and other `-cloud` tags are recognised and blocked; normal local models are allowed.
 
 **Prompt injection and AI output** (`ai.rs`)
 - An article containing a forged end marker plus "SYSTEM: ignore previous instructions": the forged marker is removed and the article stays inside the fence.

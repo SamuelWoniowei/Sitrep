@@ -27,8 +27,8 @@ It's built for people who want to keep up with security without drowning in it, 
 
 - **No account, no analytics, no telemetry, no tracking.**
 - Your reading history, backlog, projects and watchlist are stored in a local SQLite database in your user profile.
-- The only internet traffic is downloading six public feeds over HTTPS (listed in Settings and in [`src-tauri/src/net.rs`](src-tauri/src/net.rs)).
-- The optional AI runs **on your own machine** through [Ollama](https://ollama.com). Article text is never sent to a cloud AI.
+- The only internet traffic is downloading six public feeds over HTTPS and, for the 3 daily stories, the full article from those same news sites (switchable in Settings). Both lists are in [`src-tauri/src/net.rs`](src-tauri/src/net.rs).
+- The optional AI runs **on your own machine** through [Ollama](https://ollama.com). Ollama "cloud" models are blocked, so article text is never sent to a cloud AI.
 - System fonts only, so no requests to font CDNs.
 
 ## Security
@@ -38,6 +38,7 @@ Sitrep treats every feed and every AI response as hostile input. In short:
 - The UI has **no network, filesystem or shell access**. A strict Content Security Policy only lets it talk to the app's own Rust backend.
 - All feed content is converted to **plain text** before storage, and the UI never renders HTML.
 - Feeds are fetched over **HTTPS only**, from a **fixed allowlist**, with size and time limits and no cookies.
+- Full articles are fetched only from the five news sites Sitrep already reads, and reduced to plain text before the AI sees them.
 - Article links open only if they are plain `https://` links to a real domain.
 - AI prompts **fence untrusted article text** behind random per-request markers, and AI output is validated as strict JSON and stripped to plain text.
 - All database queries are parameterised.

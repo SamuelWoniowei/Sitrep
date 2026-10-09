@@ -17,6 +17,14 @@ use crate::text::{strip_controls, to_plain};
 pub const OLLAMA: &str = "http://127.0.0.1:11434";
 pub const DEFAULT_MODEL: &str = "llama3.2:3b";
 
+/// Ollama can also proxy "cloud" models (e.g. `gemma4:cloud`,
+/// `gpt-oss:120b-cloud`) that run on Ollama's servers. Using one would send
+/// article text and questions off this computer, so Sitrep refuses any model
+/// whose name mentions "cloud", whatever the user's settings say.
+pub fn is_cloud_model(name: &str) -> bool {
+    name.to_ascii_lowercase().contains("cloud")
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct AiTerm {
     pub term: String,
@@ -133,6 +141,7 @@ pub async fn list_models(client: &Client) -> Result<Vec<String>, String> {
         .models
         .into_iter()
         .map(|m| to_plain(&m.name, 100))
+        .filter(|m| !is_cloud_model(m))
         .take(100)
         .collect())
 }
@@ -148,7 +157,7 @@ pub async fn generate(client: &Client, model: &str, prompt: &str) -> Result<Stri
         "prompt": prompt,
         "format": "json",
         "stream": false,
-        "options": { "temperature": 0.2, "num_predict": 700 }
+        "options": { "temperature": 0.2, "num_predict": 700, "num_ctx": 8192 }
     });
     let resp = client
         .post(format!("{OLLAMA}/api/generate"))
@@ -175,6 +184,21 @@ mod tests {
         let f = fence(n, "ARTICLE", evil);
         assert_eq!(f.matches("<<<END_ARTICLE_abc123>>>").count(), 1);
         assert!(f.ends_with("<<<END_ARTICLE_abc123>>>"));
+    }
+
+    #[test]
+    fn cloud_models_are_recognised() {
+        for m in [
+            "gemma4:cloud",
+            "gpt-oss:120b-cloud",
+            "qwen3-coder:480b-Cloud",
+            "deepseek-v3.1:671b-cloud",
+        ] {
+            assert!(is_cloud_model(m), "{m}");
+        }
+        for m in ["llama3.2:3b", "llama3.1:8b", "mistral:7b", "phi3:mini"] {
+            assert!(!is_cloud_model(m), "{m}");
+        }
     }
 
     #[test]

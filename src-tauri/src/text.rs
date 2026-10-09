@@ -116,9 +116,91 @@ pub fn jaccard(a: &[String], b: &[String]) -> f64 {
     inter / union
 }
 
+pub const MAX_ARTICLE_CHARS: usize = 6000;
+
+/// Pull the readable body text out of a news article page: the paragraphs
+/// inside <article> (or <main>, or the whole page as a last resort), with
+/// scripts, navigation, forms and short boilerplate lines dropped. Returns
+/// plain text only.
+pub fn extract_article(html: &str) -> String {
+    let doc = Html::parse_document(html);
+    let mut paras: Vec<String> = Vec::new();
+    for scope in ["article p", "main p", "p"] {
+        let sel = scraper::Selector::parse(scope).expect("static selector");
+        paras = doc
+            .select(&sel)
+            .filter(|p| {
+                // Skip paragraphs that sit inside page furniture.
+                !p.ancestors().any(|a| {
+                    a.value().as_element().is_some_and(|e| {
+                        matches!(
+                            e.name(),
+                            "nav"
+                                | "footer"
+                                | "header"
+                                | "aside"
+                                | "form"
+                                | "noscript"
+                                | "script"
+                                | "style"
+                        )
+                    })
+                })
+            })
+            .map(|p| {
+                let mut s = String::new();
+                collect_text(p, &mut s);
+                clean_whitespace(&strip_controls(&s))
+            })
+            .filter(|t| t.chars().count() >= 40)
+            .collect();
+        if paras.iter().map(|p| p.len()).sum::<usize>() >= 400 {
+            break;
+        }
+    }
+    let mut out = String::new();
+    for p in paras {
+        if out.chars().count() + p.chars().count() > MAX_ARTICLE_CHARS {
+            break;
+        }
+        if !out.is_empty() {
+            out.push('\n');
+        }
+        out.push_str(&p);
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn article_extraction_keeps_body_drops_junk() {
+        let para =
+            "Attackers exploited a flaw in a widely used VPN product to break into networks.";
+        let html = format!(
+            r#"<html><head><script>steal()</script><style>p{{}}</style></head><body>
+            <header><p>Subscribe to our newsletter for daily updates and offers today</p></header>
+            <nav><p>Home News Security Cloud Malware Ransomware Deals Contact</p></nav>
+            <article><p>{para}</p><p>Short.</p><p>{para} <script>alert(1)</script><img src=x onerror=alert(1)></p>
+            <p>The vendor released a patch and urged customers to update immediately to the fixed version.</p>
+            <p>{para}</p><p>{para}</p><p>{para}</p></article>
+            <footer><p>Copyright notice and legal links that are long enough to count as a paragraph.</p></footer>
+            </body></html>"#
+        );
+        let t = extract_article(&html);
+        assert!(t.contains("The vendor released a patch"));
+        assert!(!t.contains("newsletter") && !t.contains("Copyright") && !t.contains("Short."));
+        assert!(!t.contains('<') && !t.contains("alert") && !t.contains("steal"));
+    }
+
+    #[test]
+    fn article_extraction_is_capped() {
+        let p = format!("<p>{}</p>", "word ".repeat(200));
+        let html = format!("<article>{}</article>", p.repeat(500));
+        assert!(extract_article(&html).chars().count() <= MAX_ARTICLE_CHARS);
+    }
 
     #[test]
     fn strips_tags_and_scripts() {
