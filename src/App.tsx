@@ -4,7 +4,7 @@ import { Today } from './Today'
 import { BacklogPage, BuiltPage, GlossaryPage, IntelPage, ProjectPage, RadarPage, RecapPage, SettingsPage, WatchlistPage } from './pages'
 import { LiveOpsPage } from './LiveOps'
 import { loadAnimations } from './prefs'
-import { briefScript, playParts, stopSpeaking } from './listen'
+import { briefScript, playParts, stopSpeaking, unlockAudio } from './listen'
 
 export type Page = 'today' | 'project' | 'backlog' | 'built' | 'recap' | 'radar' | 'glossary' | 'intel' | 'liveops' | 'watchlist' | 'settings'
 
@@ -114,12 +114,11 @@ export default function App() {
       return
     }
     if (!today?.stories.length) return
+    unlockAudio()
     setSpeaking(true)
-    const ok = await playParts(briefScript(today.stories), () => setSpeaking(false))
-    if (!ok) {
-      setSpeaking(false)
-      setNote('No private voice found. Install the natural voice in Settings → Voice.')
-    }
+    const r = await playParts(briefScript(today.stories), () => setSpeaking(false))
+    setNote(r.message)
+    if (!r.ok) setSpeaking(false)
   }
 
   const date = new Date().toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()

@@ -624,6 +624,7 @@ pub fn get_liveops(state: State<'_, AppState>) -> Res<crate::liveops::LiveOps> {
         streak: core::streak(&s, t),
         exploited_14d: core::kev_recent_count(&s, t),
         new_today: s.count_fetched_since(midnight),
+        sources: SOURCES.len(),
     })
 }
 
