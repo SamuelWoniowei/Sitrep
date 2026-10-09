@@ -312,6 +312,101 @@ pub async fn synth(exe: &Path, args: &[&str], cwd: &Path, text: &str) -> Result<
     Ok(pcm)
 }
 
+/// Pull the raw PCM out of a WAV file (16-bit mono is what Piper writes).
+pub fn wav_pcm(wav: &[u8]) -> Result<&[u8], String> {
+    if wav.len() < 44 || &wav[0..4] != b"RIFF" || &wav[8..12] != b"WAVE" {
+        return Err("The voice engine wrote an unreadable audio file.".into());
+    }
+    let mut i = 12;
+    while i + 8 <= wav.len() {
+        let id = &wav[i..i + 4];
+        let size = u32::from_le_bytes([wav[i + 4], wav[i + 5], wav[i + 6], wav[i + 7]]) as usize;
+        let start = i + 8;
+        if id == b"data" {
+            // Streaming writers may leave the size as 0 or 0xFFFFFFFF.
+            let end = if size == 0 || size > wav.len() - start { wav.len() } else { start + size };
+            return Ok(&wav[start..end]);
+        }
+        i = start.saturating_add(size).saturating_add(size & 1);
+    }
+    Err("The voice engine wrote an audio file with no sound in it.".into())
+}
+
+/// Run Piper writing a WAV file (not stdout, so Windows cannot mangle the
+/// bytes), then return the PCM. The file is deleted straight afterwards.
+pub async fn synth_file(
+    exe: &Path,
+    args: &[&str],
+    cwd: &Path,
+    out_file: &Path,
+    text: &str,
+) -> Result<Vec<u8>, String> {
+    let mut cmd = tokio::process::Command::new(exe);
+    cmd.args(args)
+        .arg("--output_file")
+        .arg(out_file)
+        .current_dir(cwd)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
+    #[cfg(windows)]
+    cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| format!("Could not start the voice engine ({}).", e.kind()))?;
+    let mut stdin = child.stdin.take().ok_or("no stdin")?;
+    let mut stderr = child.stderr.take().ok_or("no stderr")?;
+    let text = text.to_owned();
+    let writer = tokio::spawn(async move {
+        let _ = stdin.write_all(text.as_bytes()).await;
+        let _ = stdin.shutdown().await;
+    });
+    // Keep only the last few KB of the engine's log, for a useful error.
+    let log = tokio::spawn(async move {
+        let mut tail: Vec<u8> = Vec::new();
+        let mut buf = vec![0u8; 8 * 1024];
+        while let Ok(n) = stderr.read(&mut buf).await {
+            if n == 0 {
+                break;
+            }
+            tail.extend_from_slice(&buf[..n]);
+            if tail.len() > 4096 {
+                let cut = tail.len() - 4096;
+                tail.drain(..cut);
+            }
+        }
+        String::from_utf8_lossy(&tail).to_string()
+    });
+    let status = tokio::time::timeout(SYNTH_TIMEOUT, child.wait()).await;
+    let _ = writer.await;
+    let log = log.await.unwrap_or_default();
+    let status = match status {
+        Err(_) => {
+            let _ = child.kill().await;
+            let _ = std::fs::remove_file(out_file);
+            return Err("The voice engine took too long.".into());
+        }
+        Ok(r) => r.map_err(|e| e.to_string())?,
+    };
+    let bytes = std::fs::read(out_file);
+    let _ = std::fs::remove_file(out_file);
+    if !status.success() {
+        let last = log.lines().rev().find(|l| !l.trim().is_empty()).unwrap_or("");
+        let last: String = last.chars().take(160).collect();
+        return Err(format!("The voice engine stopped ({status}). {last}"));
+    }
+    let bytes = bytes.map_err(|_| "The voice engine produced no audio file.".to_string())?;
+    if bytes.len() > MAX_PCM_BYTES + 1024 {
+        return Err("voice output too large".into());
+    }
+    let pcm = wav_pcm(&bytes)?.to_vec();
+    if pcm.len() < 2_000 {
+        return Err("The voice engine produced no audio.".into());
+    }
+    Ok(pcm)
+}
+
 // ---------------- commands ----------------
 
 #[derive(Serialize)]
@@ -406,10 +501,19 @@ pub async fn speak_piper(
         .map_err(|e| e.to_string())??;
     let model = p.model.to_string_lossy().to_string();
     let config = p.config.to_string_lossy().to_string();
-    let pcm = synth(
+    let out_file = p.root.join(format!(
+        "speech-{}-{}.wav",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0)
+    ));
+    let pcm = synth_file(
         &p.exe,
-        &["--model", &model, "--config", &config, "--output_raw"],
+        &["--model", &model, "--config", &config],
         &p.piper_dir,
+        &out_file,
         &text,
     )
     .await?;
@@ -578,6 +682,41 @@ mod tests {
         use std::os::unix::fs::PermissionsExt;
         std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
         assert!(synth(&script, &[], &d, "x").await.is_err());
+    }
+
+    #[test]
+    fn wav_header_is_stripped() {
+        let mut w = b"RIFF\0\0\0\0WAVEfmt ".to_vec();
+        w.extend_from_slice(&16u32.to_le_bytes());
+        w.extend_from_slice(&[0u8; 16]);
+        w.extend_from_slice(b"data");
+        w.extend_from_slice(&4u32.to_le_bytes());
+        w.extend_from_slice(&[1, 2, 3, 4, 9, 9]);
+        assert_eq!(wav_pcm(&w).unwrap(), &[1, 2, 3, 4]);
+        assert!(wav_pcm(b"nope").is_err());
+        // Streaming size 0 means "to the end".
+        let n = w.len() - 6 - 4;
+        w[n..n + 4].copy_from_slice(&0u32.to_le_bytes());
+        assert_eq!(wav_pcm(&w).unwrap().len(), 6);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn synth_file_reads_wav_and_cleans_up() {
+        let d = tmpdir("synthfile");
+        let script = d.join("fake.sh");
+        // Last arg is the output path; write a tiny WAV with 4000 bytes of data.
+        std::fs::write(
+            &script,
+            "#!/bin/sh\ncat >/dev/null\nfor a; do o=$a; done\n{ printf 'RIFF\\0\\0\\0\\0WAVEfmt '; printf '\\20\\0\\0\\0'; head -c 16 /dev/zero; printf 'data'; printf '\\240\\17\\0\\0'; head -c 4000 /dev/zero; } > \"$o\"\n",
+        )
+        .unwrap();
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let out = d.join("o.wav");
+        let pcm = synth_file(&script, &[], &d, &out, "hi").await.unwrap();
+        assert_eq!(pcm.len(), 4000);
+        assert!(!out.exists());
     }
 
     #[test]

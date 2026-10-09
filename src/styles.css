@@ -93,7 +93,25 @@ code { font-family: var(--mono); background: var(--chrome); padding: 1px 6px; bo
 .panel-accent { border-color: var(--accent); }
 .panel-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; }
 .panel-row { display: flex; justify-content: space-between; }
-.page { max-width: 860px; gap: 10px; }
+.page { max-width: none; gap: 14px 18px; }
+/* Every page uses the whole window: full-width header, then cards in columns. */
+section.page { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 400px), 1fr)); align-items: start; }
+section.page > * { min-width: 0; }
+section.page > h1, section.page > p, section.page > .panel-head, section.page > .error, section.page > .muted,
+section.page > .why, section.page > .chips, section.page > form, section.page > .ask-field, section.page > .actions,
+section.page > .accent, section.page > .mono, section.page > .small, section.page > .h2 { grid-column: 1 / -1; }
+section.page > .row, section.page > .idea, section.page > .radar-row, section.page > .card {
+  background: var(--chrome); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+section.page > .row { border-top: 1px solid var(--line); }
+section.page > .radar-row { grid-template-columns: minmax(90px, 160px) 1fr 44px; }
+.card { display: flex; flex-direction: column; gap: 8px; }
+.card .spaced { margin-top: 0; }
+.card.span-all { grid-column: 1 / -1; }
+.span-all-2 { grid-column: span 2; }
+@media (max-width: 900px) { .span-all-2 { grid-column: auto; } }
+.cols-2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 12px; }
+.cols-2 > .row { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+.field { max-width: none; }
 .side-title { font-size: 16px; font-weight: 600; color: var(--bright); }
 .teaser { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
 
@@ -227,3 +245,7 @@ select { background: var(--chrome); border: 1px solid var(--field); border-radiu
 .page-wide .globe-row { grid-template-columns: minmax(360px, 700px) minmax(240px, 1fr); }
 .page-wide .globe { max-height: 78vh; }
 .page-wide .tiles { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+
+.card-rest { grid-column: 2 / -1; }
+@media (max-width: 900px) { .card-rest { grid-column: 1 / -1; } }
+.cols-2 > .row { border-top: 1px solid var(--line); }
