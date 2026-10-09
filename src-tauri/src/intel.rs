@@ -294,7 +294,7 @@ pub fn clusters(store: &Store, read: &HashSet<String>, since: i64) -> Vec<Cluste
 pub struct WatchRow {
     pub term: String,
     pub total: usize,
-    pub per_day: Vec<u32>, // last 14 days, oldest first
+    pub per_day: Vec<u32>,                  // last 14 days, oldest first
     pub latest: Vec<(String, String, i64)>, // id, headline, published
 }
 
@@ -307,7 +307,10 @@ pub fn watch_board(store: &Store, terms: &[String], now: i64) -> Vec<WatchRow> {
             let mut per_day = vec![0u32; 14];
             let mut hits: Vec<&StoryRow> = Vec::new();
             for s in &stories {
-                if format!("{} {}", s.title, s.summary).to_lowercase().contains(&needle) {
+                if format!("{} {}", s.title, s.summary)
+                    .to_lowercase()
+                    .contains(&needle)
+                {
                     hits.push(s);
                     let age = (now - s.published) / DAY;
                     if (0..14).contains(&age) {
@@ -1044,7 +1047,11 @@ mod tests {
         let now = 1_791_500_000;
         st.upsert_items(
             &[
-                mk("Zero-day hits VPN appliances", &["CVE-2026-7"], now - 3 * DAY),
+                mk(
+                    "Zero-day hits VPN appliances",
+                    &["CVE-2026-7"],
+                    now - 3 * DAY,
+                ),
                 mk("Vendor ships patch for VPN bug", &["CVE-2026-7"], now - DAY),
                 mk("Totally different gardening story", &[], now - 100),
             ],

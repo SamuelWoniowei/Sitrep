@@ -672,11 +672,7 @@ pub fn get_name(state: State<'_, AppState>) -> Res<String> {
 #[tauri::command]
 pub fn set_name(state: State<'_, AppState>, name: String) -> Res<String> {
     let n = name.trim().to_string();
-    if n.chars().count() > 30
-        || !n
-            .chars()
-            .all(|c| c.is_alphabetic() || " -'.".contains(c))
-    {
+    if n.chars().count() > 30 || !n.chars().all(|c| c.is_alphabetic() || " -'.".contains(c)) {
         return Err("Use up to 30 letters.".into());
     }
     lock(&state)?
@@ -704,7 +700,10 @@ pub fn get_systems(state: State<'_, AppState>) -> Res<Systems> {
         kev,
         reads,
         oldest,
-        last_sync: s.setting("last_sync").and_then(|v| v.parse().ok()).unwrap_or(0),
+        last_sync: s
+            .setting("last_sync")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0),
         sources: SOURCES.len(),
     })
 }
