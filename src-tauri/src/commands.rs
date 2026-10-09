@@ -118,19 +118,46 @@ pub async fn refresh(state: State<'_, AppState>, force: Option<bool>) -> Res<Ref
         }
     }
 
-    let store = lock(&state)?;
-    if failed.len() < SOURCES.len() {
-        store
-            .set_setting("last_sync", &t.to_string())
-            .map_err(|e| e.to_string())?;
+    let (new_stories, todo) = {
+        let store = lock(&state)?;
+        if failed.len() < SOURCES.len() {
+            store
+                .set_setting("last_sync", &t.to_string())
+                .map_err(|e| e.to_string())?;
+        }
+        if let Some(k) = kev {
+            store.replace_kev(&k).map_err(|e| e.to_string())?;
+        }
+        let new_stories = store.upsert_items(&items, t).map_err(|e| e.to_string())?;
+        let _ = store.expire_ideas(t);
+        let _ = store.prune(t);
+        let ids = core::ensure_brief(&store, t);
+        // CVEs in today's brief that still need a severity score (max 5 per
+        // refresh, which stays inside NVD's public rate limit).
+        let mut todo: Vec<String> = Vec::new();
+        for id in &ids {
+            if let Ok(Some(s)) = store.story(id) {
+                for c in s.cves.iter().take(3) {
+                    if net::valid_cve(c) && !store.has_cvss(c) && !todo.contains(c) {
+                        todo.push(c.clone());
+                    }
+                }
+            }
+        }
+        todo.truncate(5);
+        (new_stories, todo)
+    };
+    // Severity lookups are best-effort: any failure is silently skipped.
+    for (i, cve) in todo.iter().enumerate() {
+        if i > 0 {
+            tokio::time::sleep(std::time::Duration::from_secs(7)).await;
+        }
+        if let Ok(Some(score)) = net::fetch_cvss(&state.feed_client, cve).await {
+            if let Ok(store) = lock(&state) {
+                let _ = store.set_cvss(cve, score.score, &score.severity, t);
+            }
+        }
     }
-    if let Some(k) = kev {
-        store.replace_kev(&k).map_err(|e| e.to_string())?;
-    }
-    let new_stories = store.upsert_items(&items, t).map_err(|e| e.to_string())?;
-    let _ = store.expire_ideas(t);
-    let _ = store.prune(t);
-    core::ensure_brief(&store, t);
     Ok(RefreshResult {
         new_stories,
         failed,
@@ -377,15 +404,41 @@ pub fn set_full_articles(state: State<'_, AppState>, enabled: bool) -> Res<()> {
 }
 
 #[tauri::command]
+pub fn get_focus(state: State<'_, AppState>) -> Res<Vec<String>> {
+    Ok(ai::sanitize_focus(
+        &lock(&state)?.setting("career_focus").unwrap_or_default(),
+    ))
+}
+
+#[tauri::command]
+pub fn set_focus(state: State<'_, AppState>, roles: Vec<String>) -> Res<Vec<String>> {
+    let clean = ai::sanitize_focus(&roles.join(","));
+    lock(&state)?
+        .set_setting("career_focus", &clean.join(","))
+        .map_err(|e| e.to_string())?;
+    Ok(clean)
+}
+
+#[tauri::command]
+pub fn focus_options() -> Vec<&'static str> {
+    ai::FOCUS_ROLES.to_vec()
+}
+
+#[tauri::command]
 pub async fn enhance_story(state: State<'_, AppState>, id: String) -> Res<StoryCard> {
     valid_story_id(&id)?;
-    let (story, watch) = {
+    let (story, watch, focus) = {
         let s = lock(&state)?;
         let st = s
             .story(&id)
             .map_err(|e| e.to_string())?
             .ok_or("unknown story")?;
-        if s.ai_json(&id).is_some() {
+        let current = s
+            .ai_json(&id)
+            .and_then(|j| serde_json::from_str::<AiSummary>(&j).ok())
+            .map(|a| !a.gist.is_empty())
+            .unwrap_or(false);
+        if current {
             let read = s
                 .read_ids(&core::day_key(now()))
                 .unwrap_or_default()
@@ -397,12 +450,16 @@ pub async fn enhance_story(state: State<'_, AppState>, id: String) -> Res<StoryC
                 read,
             ));
         }
-        (st, s.watchlist().unwrap_or_default())
+        (
+            st,
+            s.watchlist().unwrap_or_default(),
+            ai::sanitize_focus(&s.setting("career_focus").unwrap_or_default()),
+        )
     };
     let model = ai_model(&state).await?;
     let body = article_text(&state, &story).await;
     let n = ai::nonce();
-    let prompt = ai::summary_prompt(&n, &story.title, &body, &watch);
+    let prompt = ai::summary_prompt(&n, &story.title, &body, &watch, &focus);
     let raw = ai::generate(&state.ai_client, &model, &prompt).await?;
     let summary: AiSummary = ai::validate_summary(&raw)
         .ok_or("The AI gave an unusable answer; showing the source summary instead.")?;

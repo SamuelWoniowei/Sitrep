@@ -84,6 +84,7 @@ impl Store {
                completed INTEGER NOT NULL DEFAULT 0, completed_at INTEGER);
              CREATE TABLE IF NOT EXISTS watchlist(term TEXT PRIMARY KEY);
              CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+             CREATE TABLE IF NOT EXISTS cvss(cve TEXT PRIMARY KEY, score REAL NOT NULL, severity TEXT NOT NULL, fetched INTEGER NOT NULL);
              CREATE TABLE IF NOT EXISTS quiz(day TEXT PRIMARY KEY, term TEXT NOT NULL, options TEXT NOT NULL, answer INTEGER NOT NULL, chosen INTEGER);",
         )?;
         Ok(Store { conn })
@@ -246,6 +247,35 @@ impl Store {
                 |r| r.get(0),
             )
             .unwrap_or(0)
+    }
+
+    // ---------- CVSS (NVD) ----------
+    pub fn cvss(&self, cve: &str) -> Option<(f64, String)> {
+        self.conn
+            .query_row(
+                "SELECT score, severity FROM cvss WHERE cve=?1",
+                params![cve],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .optional()
+            .ok()
+            .flatten()
+    }
+    pub fn has_cvss(&self, cve: &str) -> bool {
+        self.cvss(cve).is_some()
+    }
+    pub fn set_cvss(
+        &self,
+        cve: &str,
+        score: f64,
+        severity: &str,
+        now: i64,
+    ) -> rusqlite::Result<()> {
+        self.conn.execute(
+            "INSERT OR REPLACE INTO cvss(cve,score,severity,fetched) VALUES(?1,?2,?3,?4)",
+            params![cve, score, severity, now],
+        )?;
+        Ok(())
     }
 
     // ---------- AI cache ----------

@@ -72,7 +72,34 @@ export function StoryCard({ story, index, open, deeper, aiReady, onOpen, onRead 
       {open && (
         <>
           <p><span className="mono accent">TL;DR </span>{story.tldr}</p>
+          {story.gist && <p className="gist">{story.gist}</p>}
+          {story.cvss.length > 0 && (
+            <div className="chips">
+              {story.cvss.map((c) => (
+                <span key={c.cve} className={`tag ${c.severity === 'CRITICAL' || c.exploited ? 'tag-red' : c.severity === 'HIGH' ? 'tag-amber' : 'tag-grey'}`}>
+                  {c.cve} · {c.score.toFixed(1)} {c.severity}{c.exploited ? ' · EXPLOITED' : ''}
+                </span>
+              ))}
+            </div>
+          )}
+          {story.plain && (
+            <div className="plain">
+              <span className="tag tag-ai" title="Written by your local AI">AI</span> <strong>In plain words: </strong>
+              <span className="muted">{story.plain}</span>
+            </div>
+          )}
+          {story.action && <div className="why"><strong>What to do: </strong><span className="muted">{story.action}</span></div>}
           <div className="why"><strong>Why it matters to you: </strong><span className="muted">{story.why}</span></div>
+          {story.roles.length > 0 && (
+            <div className="roles">
+              {story.roles.map((r) => (
+                <div key={r.role} className="role">
+                  <div className="mono tiny accent">{r.role.toUpperCase()}</div>
+                  <div className="small muted">{r.note}</div>
+                </div>
+              ))}
+            </div>
+          )}
           {deeper && (
             <div className="deeper">
               <div className="label">DEEPER</div>

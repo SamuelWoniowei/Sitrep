@@ -13,7 +13,7 @@ use url::Url;
 
 pub const MAX_FEED_BYTES: usize = 5 * 1024 * 1024;
 pub const MAX_AI_BYTES: usize = 512 * 1024;
-const USER_AGENT: &str = "Sitrep/0.1 (+https://github.com/samuelwoniowei/sitrep)";
+const USER_AGENT: &str = "Sitrep/0.2 (+https://github.com/samuelwoniowei/sitrep)";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FeedKind {
@@ -69,6 +69,34 @@ pub const SOURCES: &[Source] = &[
         uk: false,
     },
     Source {
+        id: "cisa_adv",
+        name: "CISA Advisories",
+        url: "https://www.cisa.gov/cybersecurity-advisories/all.xml",
+        kind: FeedKind::Rss,
+        uk: false,
+    },
+    Source {
+        id: "msrc",
+        name: "Microsoft MSRC",
+        url: "https://api.msrc.microsoft.com/update-guide/rss",
+        kind: FeedKind::Rss,
+        uk: false,
+    },
+    Source {
+        id: "talos",
+        name: "Cisco Talos",
+        url: "https://blog.talosintelligence.com/rss/",
+        kind: FeedKind::Rss,
+        uk: false,
+    },
+    Source {
+        id: "krebs",
+        name: "Krebs on Security",
+        url: "https://krebsonsecurity.com/feed/",
+        kind: FeedKind::Rss,
+        uk: false,
+    },
+    Source {
         id: "kev",
         name: "CISA KEV",
         url: "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json",
@@ -83,6 +111,9 @@ const EXTRA_ALLOWED_HOSTS: &[&str] = &[
     "feeds.feedblitz.com",
     "bleepingcomputer.com",
 ];
+
+/// The one host used for CVE severity lookups (NIST NVD API).
+pub const NVD_HOST: &str = "services.nvd.nist.gov";
 
 pub fn allowed_host(host: &str) -> bool {
     let host = host.to_ascii_lowercase();
@@ -148,6 +179,9 @@ pub const ARTICLE_HOSTS: &[&str] = &[
     "thehackernews.com",
     "www.ncsc.gov.uk",
     "isc.sans.edu",
+    "www.cisa.gov",
+    "krebsonsecurity.com",
+    "blog.talosintelligence.com",
 ];
 pub const MAX_ARTICLE_BYTES: usize = 2 * 1024 * 1024;
 
@@ -242,9 +276,129 @@ pub async fn fetch_source(client: &Client, src: &Source) -> Result<Vec<u8>, Stri
     read_capped(resp, MAX_FEED_BYTES).await
 }
 
+/// `CVE-YYYY-NNNN…` and nothing else. Used before an ID is placed in a URL.
+pub fn valid_cve(id: &str) -> bool {
+    let b = id.as_bytes();
+    id.len() >= 13
+        && id.len() <= 20
+        && id.starts_with("CVE-")
+        && b[8] == b'-'
+        && b[4..8].iter().all(u8::is_ascii_digit)
+        && b[9..].iter().all(u8::is_ascii_digit)
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Cvss {
+    pub score: f64,
+    pub severity: String,
+}
+
+/// Pull the best CVSS base score out of an NVD 2.0 response.
+pub fn parse_nvd(bytes: &[u8]) -> Option<Cvss> {
+    let v: serde_json::Value = serde_json::from_slice(bytes).ok()?;
+    let metrics = v
+        .get("vulnerabilities")?
+        .get(0)?
+        .get("cve")?
+        .get("metrics")?;
+    for key in ["cvssMetricV40", "cvssMetricV31", "cvssMetricV30"] {
+        if let Some(d) = metrics
+            .get(key)
+            .and_then(|m| m.get(0))
+            .and_then(|m| m.get("cvssData"))
+        {
+            let score = d.get("baseScore")?.as_f64()?;
+            if !(0.0..=10.0).contains(&score) {
+                return None;
+            }
+            let sev = match d.get("baseSeverity").and_then(|s| s.as_str()).unwrap_or("") {
+                s @ ("LOW" | "MEDIUM" | "HIGH" | "CRITICAL") => s.to_string(),
+                _ => severity_for(score).to_string(),
+            };
+            return Some(Cvss {
+                score,
+                severity: sev,
+            });
+        }
+    }
+    None
+}
+
+pub fn severity_for(score: f64) -> &'static str {
+    match score {
+        s if s >= 9.0 => "CRITICAL",
+        s if s >= 7.0 => "HIGH",
+        s if s >= 4.0 => "MEDIUM",
+        _ => "LOW",
+    }
+}
+
+/// Look up one CVE's severity on NVD. The ID is validated, the host is fixed,
+/// the response is size-capped and only a number and a label are kept.
+pub async fn fetch_cvss(client: &Client, cve: &str) -> Result<Option<Cvss>, String> {
+    if !valid_cve(cve) {
+        return Err("invalid CVE id".into());
+    }
+    let url = Url::parse(&format!(
+        "https://{NVD_HOST}/rest/json/cves/2.0?cveId={cve}"
+    ))
+    .map_err(|e| e.to_string())?;
+    let resp = client.get(url).send().await.map_err(|e| e.to_string())?;
+    if resp.url().host_str() != Some(NVD_HOST) {
+        return Err("redirected outside allowlist".into());
+    }
+    if !resp.status().is_success() {
+        return Err(format!("HTTP {}", resp.status()));
+    }
+    Ok(parse_nvd(&read_capped(resp, 1024 * 1024).await?))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cve_ids_are_validated() {
+        for ok in ["CVE-2026-1234", "CVE-2024-12345678", "CVE-2025-0001"] {
+            assert!(valid_cve(ok), "{ok}");
+        }
+        for bad in [
+            "",
+            "cve-2026-1234",
+            "CVE-2026-12",
+            "CVE-2026-1234&x=1",
+            "CVE-2026-1234/../..",
+            "CVE-20X6-1234",
+            "CVE-2026-1234 ",
+            "CVE-2026-123456789012",
+        ] {
+            assert!(!valid_cve(bad), "{bad}");
+        }
+    }
+
+    #[test]
+    fn nvd_response_parsed_and_bounded() {
+        let ok = br#"{"vulnerabilities":[{"cve":{"metrics":{"cvssMetricV31":[{"cvssData":{"baseScore":9.8,"baseSeverity":"CRITICAL"}}]}}}]}"#;
+        assert_eq!(
+            parse_nvd(ok),
+            Some(Cvss {
+                score: 9.8,
+                severity: "CRITICAL".into()
+            })
+        );
+        let weird = br#"{"vulnerabilities":[{"cve":{"metrics":{"cvssMetricV31":[{"cvssData":{"baseScore":7.5,"baseSeverity":"<script>"}}]}}}]}"#;
+        assert_eq!(parse_nvd(weird).unwrap().severity, "HIGH");
+        let huge = br#"{"vulnerabilities":[{"cve":{"metrics":{"cvssMetricV31":[{"cvssData":{"baseScore":99.0}}]}}}]}"#;
+        assert!(parse_nvd(huge).is_none());
+        assert!(parse_nvd(b"not json").is_none());
+        assert!(parse_nvd(b"{}").is_none());
+    }
+
+    #[tokio::test]
+    async fn nvd_lookup_rejects_bad_ids_without_network() {
+        let c = feed_client().unwrap();
+        assert!(fetch_cvss(&c, "CVE-2026-1234&evil=1").await.is_err());
+    }
 
     #[test]
     fn allowlist_accepts_sources_only() {
@@ -339,6 +493,9 @@ mod tests {
             "https://thehackernews.com/2026/10/x.html",
             "https://www.ncsc.gov.uk/news/x",
             "https://isc.sans.edu/diary/12345",
+            "https://www.cisa.gov/news-events/alerts/x",
+            "https://krebsonsecurity.com/2026/10/x/",
+            "https://blog.talosintelligence.com/x/",
         ] {
             assert!(article_fetchable(&Url::parse(ok).unwrap()), "{ok}");
         }
@@ -350,7 +507,8 @@ mod tests {
             "https://user:pw@therecord.media/x",
             "https://therecord.media:8443/x",
             "https://feeds.feedburner.com/x",
-            "https://www.cisa.gov/x",
+            "https://cisa.gov.evil.example/x",
+            "https://services.nvd.nist.gov/x",
             "https://127.0.0.1/x",
             "https://[::1]/x",
         ] {

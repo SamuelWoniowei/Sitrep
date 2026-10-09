@@ -272,6 +272,29 @@ function UpdatesSection() {
   )
 }
 
+function FocusSection() {
+  const [options] = useLoad(api.focusOptions)
+  const [picked, setPicked, err] = useLoad(api.focus)
+  const [e2, setE2] = useState<string | null>(null)
+  const toggle = (r: string) => {
+    if (!picked) return
+    const next = picked.includes(r) ? picked.filter((x) => x !== r) : [...picked, r]
+    api.setFocus(next).then(setPicked).catch((e) => setE2(errText(e)))
+  }
+  return (
+    <>
+      <h2 className="mono h2 spaced">CAREER FOCUS</h2>
+      <p className="small muted">Pick the roles you care about. Summaries add a short "what this means for you" note for each. Applies to summaries written from now on.</p>
+      <div className="chips">
+        {options?.map((r) => (
+          <button key={r} type="button" className={`chip ${picked?.includes(r) ? 'chip-on' : ''}`} aria-pressed={picked?.includes(r) ?? false} onClick={() => toggle(r)}>{r}</button>
+        ))}
+      </div>
+      {(err || e2) && <div className="error small">{err ?? e2}</div>}
+    </>
+  )
+}
+
 export function SettingsPage({ onAiChange }: { onAiChange: () => void }) {
   const [ai, setAi, err, reloadAi] = useLoad<AiStatus>(api.aiStatus)
   const [sources] = useLoad(api.sources)
@@ -319,19 +342,21 @@ export function SettingsPage({ onAiChange }: { onAiChange: () => void }) {
             Read the full article for today's 3 stories (better summaries)
           </label>
           <p className="tiny muted">
-            Only fetched from the same five news sites as the feeds, never from other links. Cloud models are always blocked.
+            Only fetched from the same news sites as the feeds, never from other links. Cloud models are always blocked.
           </p>
           <button type="button" className="btn" onClick={() => { reloadAi(); onAiChange() }}>Check again</button>
         </>
       )}
       {e2 && <div className="error">{e2}</div>}
 
+      <FocusSection />
+
       <UpdatesSection />
 
       <h2 className="mono h2 spaced">PRIVACY</h2>
       <ul className="small muted plain-list">
         <li>No account, no analytics, no tracking. Your reading history, backlog and watchlist stay in a local database on this computer.</li>
-        <li>The only internet traffic is downloading the public feeds below and, if enabled, the full text of today's 3 stories from those same news sites.</li>
+        <li>The only internet traffic is downloading the public feeds below, CVE severity scores from NIST's NVD (only the CVE ID is sent) and, if enabled, the full text of today's 3 stories from those same news sites.</li>
         <li>The AI runs only on this computer (127.0.0.1). Ollama "cloud" models are blocked so article text never leaves your PC.</li>
         <li>Article links open in your normal browser only when you click "Read source".</li>
       </ul>
