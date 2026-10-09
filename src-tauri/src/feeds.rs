@@ -66,7 +66,7 @@ pub fn parse_rss(bytes: &[u8], src: &Source, now: i64) -> Result<Vec<RawItem>, S
             .map(|s| s.content)
             .or_else(|| entry.content.and_then(|c| c.body))
             .unwrap_or_default();
-        let summary = to_plain(&raw_summary, MAX_SUMMARY);
+        let summary = crate::text::strip_feed_boilerplate(&to_plain(&raw_summary, MAX_SUMMARY));
         let link = entry
             .links
             .iter()

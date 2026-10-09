@@ -7,6 +7,7 @@ pub mod net;
 pub mod store;
 pub mod text;
 pub mod themes;
+pub mod updates;
 
 use std::sync::Mutex;
 
@@ -18,6 +19,7 @@ use commands::AppState;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             // The database lives in the per-user app data folder, readable only
             // by the current OS user.
@@ -59,6 +61,9 @@ pub fn run() {
             commands::add_watch,
             commands::remove_watch,
             commands::list_sources,
+            updates::app_version,
+            updates::check_update,
+            updates::install_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running the application");

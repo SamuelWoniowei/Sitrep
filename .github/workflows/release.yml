@@ -1,9 +1,10 @@
 name: Release
 
-# Push a tag like v0.1.0 to build the Windows installer and publish a draft release.
+# Manual only: run it from the Actions tab ("Run workflow"). It builds the
+# Windows installer, signs the update with the private key held in this
+# repo's secrets, and creates a DRAFT release. Nothing reaches the app's
+# updater until you review the draft and click Publish.
 on:
-  push:
-    tags: ['v*']
   workflow_dispatch:
 
 permissions:
@@ -12,26 +13,42 @@ permissions:
 jobs:
   windows:
     runs-on: windows-latest
+    environment: release
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
       - run: npm ci
       - name: Tests before release
         working-directory: src-tauri
-        run: cargo test
-      - uses: tauri-apps/tauri-action@v0
+        run: cargo test --locked
+      - name: Build, sign and create draft release
+        id: tauri
+        uses: tauri-apps/tauri-action@2d793bf2c8c505b9b76211601b09aab48922225d # v1.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'Sitrep ${{ github.ref_name }}'
-          releaseBody: 'Download the -setup.exe below. The installer is not code-signed yet, so Windows SmartScreen may warn: choose More info → Run anyway. See README for the optional local AI setup.'
+          tagName: v__VERSION__
+          releaseName: 'Sitrep v__VERSION__'
+          releaseBody: 'Install: download the -setup.exe below and check its SHA-256 against SHA256SUMS.txt. Existing installs: Settings → Check for updates.'
           releaseDraft: true
           prerelease: false
+          uploadUpdaterJson: true
+          updaterJsonPreferNsis: true
+      - name: Publish SHA-256 checksums
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.tauri.outputs.appVersion }}
+        run: |
+          $files = Get-ChildItem src-tauri/target/release/bundle/nsis/*.exe
+          $files | Get-FileHash -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" } | Set-Content SHA256SUMS.txt
+          Get-Content SHA256SUMS.txt
+          gh release upload "v$env:VERSION" SHA256SUMS.txt --clobber

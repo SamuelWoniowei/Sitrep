@@ -199,7 +199,12 @@ pub fn get_today(state: State<'_, AppState>) -> Res<Today> {
         idea_cap: crate::store::BACKLOG_CAP,
         ideas: ideas.into_iter().take(3).collect(),
         recap_days_until: core::recap(&store, t).days_until,
-        radar_top: core::radar(&store, t).into_iter().take(3).collect(),
+        // "Patching" matches nearly every story, so it isn't a useful trend.
+        radar_top: core::radar(&store, t)
+            .into_iter()
+            .filter(|r| r.key != "patching")
+            .take(3)
+            .collect(),
         watchlist: watch,
         stories,
         day,
