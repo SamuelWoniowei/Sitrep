@@ -33,7 +33,12 @@ export interface Story {
 }
 
 export interface GlossEntry { key: string; term: string; plain: string; analogy: string; status: 'new' | 'learning' | 'known'; origin: 'builtin' | 'ai' }
-export interface ActorSeen { name: string; kind: string; origin: string; country: string; blurb: string; stories: [string, string][] }
+export interface ActorSeen { name: string; kind: string; origin: string; country: string; blurb: string; wants: string; how: string; stories: [string, string][] }
+export interface ClusterItem { id: string; title: string; source: string; published: number; day: number; read: boolean; new: boolean }
+export interface Cluster { title: string; first: number; last: number; days: number; cves: string[]; new_count: number; items: ClusterItem[] }
+export interface WatchRow { term: string; total: number; per_day: number[]; latest: [string, string, number][] }
+export interface WeekStory { id: string; headline: string; published: number; cves: string[]; iocs: number }
+export interface Systems { stories: number; kev: number; reads: number; oldest: number; last_sync: number; sources: number }
 export interface Exposure { program: string; vendor: string; product: string; cves: string[]; latest_added: string; ransomware: boolean }
 export interface ExposureResult { supported: boolean; programs: number; window_days: number; matches: Exposure[] }
 export interface LabPackResult { folder: string; ips: number; domains: number; hashes: number }
@@ -153,6 +158,12 @@ export const api = {
   setAnimations: (on: boolean) => invoke<void>('set_animations', { on }),
   liveops: () => invoke<LiveOps>('get_liveops'),
   actors: () => invoke<ActorSeen[]>('get_actors'),
+  developing: () => invoke<Cluster[]>('get_developing'),
+  watchBoard: () => invoke<WatchRow[]>('get_watch_board'),
+  weekStories: () => invoke<WeekStory[]>('get_week_stories'),
+  getName: () => invoke<string>('get_name'),
+  setName: (name: string) => invoke<string>('set_name', { name }),
+  systems: () => invoke<Systems>('get_systems'),
   exposure: () => invoke<ExposureResult>('check_exposure'),
   labPack: (id: string) => invoke<LabPackResult>('export_lab_pack', { id }),
   answerQuiz: (choice: number) => invoke<Quiz | null>('answer_quiz', { choice }),

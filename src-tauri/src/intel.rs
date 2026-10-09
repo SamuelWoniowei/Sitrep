@@ -186,6 +186,181 @@ pub fn developing(store: &Store, story: &StoryRow) -> Vec<TimelineItem> {
     out
 }
 
+#[derive(Serialize, Clone, Debug)]
+pub struct ClusterItem {
+    pub id: String,
+    pub title: String,
+    pub source: String,
+    pub published: i64,
+    pub day: i64, // 1 = first story in the cluster
+    pub read: bool,
+    pub new: bool, // unread and newer than something you already read
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct Cluster {
+    pub title: String,
+    pub first: i64,
+    pub last: i64,
+    pub days: i64,
+    pub cves: Vec<String>,
+    pub new_count: usize,
+    pub items: Vec<ClusterItem>,
+}
+
+/// Group stories from `since` onward into developing stories: two stories join
+/// when they share a CVE or have similar titles. Only groups of 2+ are kept.
+pub fn clusters(store: &Store, read: &HashSet<String>, since: i64) -> Vec<Cluster> {
+    let stories = store.stories_since(since).unwrap_or_default();
+    let n = stories.len().min(600);
+    let stories = &stories[..n];
+    let toks: Vec<Vec<String>> = stories.iter().map(|s| title_tokens(&s.title)).collect();
+    let mut parent: Vec<usize> = (0..n).collect();
+    fn find(p: &mut [usize], mut x: usize) -> usize {
+        while p[x] != x {
+            p[x] = p[p[x]];
+            x = p[x];
+        }
+        x
+    }
+    for i in 0..n {
+        for j in (i + 1)..n {
+            let cve = stories[i].cves.iter().any(|c| stories[j].cves.contains(c));
+            if cve
+                || ((stories[i].published - stories[j].published).abs() <= 14 * DAY
+                    && jaccard(&toks[i], &toks[j]) >= 0.35)
+            {
+                let (a, b) = (find(&mut parent, i), find(&mut parent, j));
+                if a != b {
+                    parent[a] = b;
+                }
+            }
+        }
+    }
+    let mut groups: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+    for i in 0..n {
+        let r = find(&mut parent, i);
+        groups.entry(r).or_default().push(i);
+    }
+    let mut out: Vec<Cluster> = Vec::new();
+    for (_, mut idx) in groups {
+        if idx.len() < 2 {
+            continue;
+        }
+        idx.sort_by_key(|&i| stories[i].published);
+        let first = stories[idx[0]].published;
+        let mut seen_read_at: Option<i64> = None;
+        let mut items = Vec::new();
+        for &i in idx.iter().take(10) {
+            let s = &stories[i];
+            let is_read = read.contains(&s.id);
+            let new = !is_read && seen_read_at.is_some_and(|t| s.published >= t);
+            if is_read && seen_read_at.is_none() {
+                seen_read_at = Some(s.published);
+            }
+            items.push(ClusterItem {
+                id: s.id.clone(),
+                title: to_plain(&s.title, 140),
+                source: s.sources.first().cloned().unwrap_or_default(),
+                published: s.published,
+                day: (s.published - first) / DAY + 1,
+                read: is_read,
+                new,
+            });
+        }
+        let mut cves: Vec<String> = idx.iter().flat_map(|&i| stories[i].cves.clone()).collect();
+        cves.sort();
+        cves.dedup();
+        cves.truncate(4);
+        let last = stories[*idx.last().unwrap()].published;
+        out.push(Cluster {
+            title: to_plain(&stories[*idx.last().unwrap()].title, 140),
+            first,
+            last,
+            days: (last - first) / DAY + 1,
+            cves,
+            new_count: items.iter().filter(|i| i.new).count(),
+            items,
+        });
+    }
+    out.sort_by_key(|c| std::cmp::Reverse(c.last));
+    out.truncate(12);
+    out
+}
+
+// ======================= watchlist board =======================
+
+#[derive(Serialize, Clone, Debug)]
+pub struct WatchRow {
+    pub term: String,
+    pub total: usize,
+    pub per_day: Vec<u32>, // last 14 days, oldest first
+    pub latest: Vec<(String, String, i64)>, // id, headline, published
+}
+
+pub fn watch_board(store: &Store, terms: &[String], now: i64) -> Vec<WatchRow> {
+    let stories = store.stories_since(now - 30 * DAY).unwrap_or_default();
+    terms
+        .iter()
+        .map(|term| {
+            let needle = term.to_lowercase();
+            let mut per_day = vec![0u32; 14];
+            let mut hits: Vec<&StoryRow> = Vec::new();
+            for s in &stories {
+                if format!("{} {}", s.title, s.summary).to_lowercase().contains(&needle) {
+                    hits.push(s);
+                    let age = (now - s.published) / DAY;
+                    if (0..14).contains(&age) {
+                        per_day[(13 - age) as usize] += 1;
+                    }
+                }
+            }
+            WatchRow {
+                term: term.clone(),
+                total: hits.len(),
+                per_day,
+                latest: hits
+                    .iter()
+                    .take(4)
+                    .map(|s| (s.id.clone(), to_plain(&s.title, 120), s.published))
+                    .collect(),
+            }
+        })
+        .collect()
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct WeekStory {
+    pub id: String,
+    pub headline: String,
+    pub published: i64,
+    pub cves: Vec<String>,
+    pub iocs: usize,
+}
+
+/// Last 7 days of stories that carry CVEs or indicators: candidates for the lab pack.
+pub fn week_stories(store: &Store, now: i64) -> Vec<WeekStory> {
+    let mut v: Vec<WeekStory> = store
+        .stories_since(now - 7 * DAY)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|s| {
+            let i = extract_iocs(&format!("{} {}", s.title, s.summary));
+            WeekStory {
+                headline: to_plain(&s.title, 140),
+                published: s.published,
+                iocs: i.ips.len() + i.domains.len() + i.sha256.len() + i.md5.len(),
+                cves: s.cves.iter().take(4).cloned().collect(),
+                id: s.id,
+            }
+        })
+        .filter(|w| w.iocs > 0 || !w.cves.is_empty())
+        .collect();
+    v.sort_by_key(|w| std::cmp::Reverse((w.cves.len() + w.iocs.min(5), w.published)));
+    v.truncate(24);
+    v
+}
+
 // ======================= threat actors =======================
 
 pub struct Actor {
@@ -245,7 +420,30 @@ pub struct ActorSeen {
     pub origin: &'static str,
     pub country: &'static str,
     pub blurb: &'static str,
+    pub wants: &'static str,
+    pub how: &'static str,
     pub stories: Vec<(String, String)>, // (id, headline)
+}
+
+/// (what they want, how they usually operate): short, plain-English.
+pub fn profile(name: &str) -> (&'static str, &'static str) {
+    match name {
+        "APT28" => ("Political and military intelligence, and influence over governments and elections.", "Spear-phishing, fake login pages and password guessing to steal credentials, then quiet access to email and networks."),
+        "APT29" => ("Long-term foreign-policy and security intelligence.", "Stealthy access to cloud accounts and email, stolen sign-in tokens and supply-chain compromise. Avoids noisy malware."),
+        "Sandworm" => ("Disruption and destruction, to pressure Ukraine and its allies.", "Breaks into IT and industrial networks, then uses wiper malware and power-grid attacks, sometimes disguised as ransomware."),
+        "Lazarus Group" => ("Money for the North Korean state, plus some espionage.", "Fake job offers and trojanised software aimed at crypto and tech firms, then laundering the stolen funds."),
+        "Kimsuky" => ("Intelligence on foreign policy, nuclear and sanctions matters.", "Tailored phishing posing as journalists or academics, then malicious documents and credential theft."),
+        "Volt Typhoon" => ("Hidden, lasting access to critical infrastructure, reported as preparation for possible future disruption.", "Exploits internet-facing devices such as routers and VPNs, then uses built-in Windows tools to blend in with normal activity."),
+        "Salt Typhoon" => ("Intelligence from telecom networks: who talks to whom, and some message content.", "Compromises network devices at telecom providers and stays hidden for long periods."),
+        "APT41" => ("Espionage for the state and, separately, profit.", "Exploits flaws in internet-facing software and supply-chain access, with a wide malware toolkit."),
+        "MuddyWater" => ("Intelligence on governments and telecoms, mainly in the Middle East.", "Phishing that installs remote-admin tools, then scripts and legitimate software to stay in."),
+        "Charming Kitten" => ("Information about journalists, activists, academics and officials that Iran cares about.", "Long, friendly conversations and fake meeting links that end in credential theft."),
+        "Scattered Spider" => ("Money, through data theft, extortion and ransomware.", "Phones IT help desks pretending to be staff to get passwords or MFA reset, then moves into cloud and virtual machines."),
+        "LockBit" => ("Ransom payments.", "Affiliates get in through stolen logins or unpatched systems, steal data, encrypt files, then demand payment to unlock and not to leak."),
+        "ALPHV / BlackCat" => ("Ransom payments.", "Affiliates rented the ransomware, stole data first, then threatened to publish it."),
+        "Cl0p" => ("Mass extortion payments.", "Finds a flaw in widely used file-transfer software, steals data from many victims at once, then demands payment not to leak it."),
+        _ => ("", ""),
+    }
 }
 
 pub fn actors_seen(store: &Store, since: i64) -> Vec<ActorSeen> {
@@ -259,6 +457,8 @@ pub fn actors_seen(store: &Store, since: i64) -> Vec<ActorSeen> {
                     origin: a.origin,
                     country: a.country,
                     blurb: a.blurb,
+                    wants: profile(a.name).0,
+                    how: profile(a.name).1,
                     stories: vec![],
                 })
                 .stories
@@ -633,6 +833,14 @@ pub fn lab_pack_files(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn every_actor_has_a_profile() {
+        for a in super::ACTORS {
+            let (w, h) = super::profile(a.name);
+            assert!(!w.is_empty() && !h.is_empty(), "{}", a.name);
+        }
+    }
+
     use super::*;
 
     #[test]
@@ -818,6 +1026,46 @@ mod tests {
             .iter()
             .filter(|e| e.origin == "ai")
             .all(|e| e.status == "known"));
+    }
+
+    #[test]
+    fn clusters_number_days_and_flag_new() {
+        use crate::feeds::RawItem;
+        let st = Store::open_in_memory().unwrap();
+        let mk = |title: &str, cve: &[&str], ts: i64| RawItem {
+            title: title.into(),
+            link: Some(format!("https://example.org/{}", ts)),
+            summary: "x".into(),
+            published: ts,
+            source_id: "s".into(),
+            source_name: "S".into(),
+            cves: cve.iter().map(|c| c.to_string()).collect(),
+        };
+        let now = 1_791_500_000;
+        st.upsert_items(
+            &[
+                mk("Zero-day hits VPN appliances", &["CVE-2026-7"], now - 3 * DAY),
+                mk("Vendor ships patch for VPN bug", &["CVE-2026-7"], now - DAY),
+                mk("Totally different gardening story", &[], now - 100),
+            ],
+            now,
+        )
+        .unwrap();
+        let first = st
+            .stories_since(0)
+            .unwrap()
+            .into_iter()
+            .find(|s| s.title.starts_with("Zero-day"))
+            .unwrap();
+        let mut read = HashSet::new();
+        read.insert(first.id);
+        let c = clusters(&st, &read, 0);
+        assert_eq!(c.len(), 1);
+        assert_eq!(c[0].items.len(), 2);
+        assert_eq!(c[0].items[0].day, 1);
+        assert_eq!(c[0].items[1].day, 3);
+        assert!(!c[0].items[0].new && c[0].items[1].new);
+        assert_eq!(c[0].new_count, 1);
     }
 
     #[test]

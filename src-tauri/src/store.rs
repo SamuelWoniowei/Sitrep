@@ -498,6 +498,20 @@ impl Store {
         let rows = st.query_map(params![day], |r| r.get(0))?;
         rows.collect()
     }
+    pub fn all_read_ids(&self) -> rusqlite::Result<std::collections::HashSet<String>> {
+        let mut st = self.conn.prepare("SELECT DISTINCT story_id FROM reads")?;
+        let rows = st.query_map([], |r| r.get::<_, String>(0))?;
+        rows.collect()
+    }
+    pub fn counts(&self) -> rusqlite::Result<(i64, i64, i64, i64)> {
+        let one = |sql: &str| self.conn.query_row(sql, [], |r| r.get::<_, i64>(0));
+        Ok((
+            one("SELECT COUNT(*) FROM stories")?,
+            one("SELECT COUNT(*) FROM kev")?,
+            one("SELECT COUNT(*) FROM reads")?,
+            one("SELECT COALESCE(MIN(published),0) FROM stories")?,
+        ))
+    }
     pub fn read_days(&self) -> rusqlite::Result<Vec<String>> {
         let mut st = self
             .conn

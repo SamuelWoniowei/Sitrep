@@ -249,3 +249,27 @@ select { background: var(--chrome); border: 1px solid var(--field); border-radiu
 .card-rest { grid-column: 2 / -1; }
 @media (max-width: 900px) { .card-rest { grid-column: 1 / -1; } }
 .cols-2 > .row { border-top: 1px solid var(--line); }
+
+/* v0.2.2: live indicator, timelines, attack flow, watch board, systems */
+.live { display: inline-flex; align-items: center; gap: 8px; color: var(--accent); margin-left: 16px; }
+.live-dot { animation: pulse 1.6s ease-out infinite; }
+.actor-name { font-size: 15px; color: var(--bright); }
+.actor { gap: 6px; }
+.timeline { list-style: none; margin: 6px 0 0; padding: 0 0 0 14px; border-left: 2px solid var(--line-2); display: flex; flex-direction: column; gap: 12px; }
+.tl-item { position: relative; display: flex; flex-direction: column; gap: 2px; }
+.tl-dot { position: absolute; left: -21px; top: 4px; width: 10px; height: 10px; border-radius: 5px; background: var(--line-2); border: 2px solid var(--panel); }
+.tl-new .tl-dot { background: var(--accent); }
+.tl-new .mono { color: var(--accent); }
+.flow { list-style: none; margin: 4px 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.flow-step { position: relative; flex: 1 1 110px; display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; opacity: 0.45; }
+.flow-step::after { content: '→'; position: absolute; right: -11px; top: 12px; color: var(--muted); }
+.flow-step:last-child::after { content: ''; }
+.flow-dot { width: 8px; height: 8px; border-radius: 4px; background: var(--muted); }
+.flow-on { opacity: 1; border-color: var(--accent); animation: flow-in 0.5s ease-out both; }
+.flow-on .flow-dot { background: var(--accent); }
+@keyframes flow-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.spark { display: flex; align-items: flex-end; gap: 3px; height: 36px; }
+.spark-bar { flex: 1; background: var(--accent); border-radius: 2px; }
+.watch-n { font-size: 22px; font-weight: 600; }
+.sys-row { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-top: 1px solid var(--line-2); }
+.sys-row:first-of-type { border-top: none; }

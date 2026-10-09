@@ -7,19 +7,19 @@ function ago(ts: number): string {
   return d === 0 ? 'today' : `${d}d ago`
 }
 
-// Streak calendar: the last 12 weeks, one square per day, oldest on the left.
+// Streak calendar: the last 16 weeks, one square per day, oldest on the left.
 function Calendar({ days, today }: { days: string[]; today: string }) {
   const set = new Set(days)
   const end = new Date(today + 'T12:00:00')
   const cells: { key: string; on: boolean }[] = []
-  for (let i = 83; i >= 0; i--) {
+  for (let i = 111; i >= 0; i--) {
     const d = new Date(end)
     d.setDate(end.getDate() - i)
     const key = d.toISOString().slice(0, 10)
     cells.push({ key, on: set.has(key) })
   }
   return (
-    <div className="cal" role="img" aria-label={`You read the brief on ${days.length} of the last 84 days`}>
+    <div className="cal" role="img" aria-label={`You read the brief on ${days.length} of the last 112 days`}>
       {cells.map((c) => <span key={c.key} className={`cal-cell ${c.on ? 'cal-on' : ''}`} title={c.key} />)}
     </div>
   )
@@ -146,9 +146,9 @@ export function LiveOpsPage({ onOpenStory }: { onOpenStory: () => void }) {
       <h2 className="mono h2 spaced">GROUPS AND FLAWS NAMED TOGETHER</h2>
       <Connections edges={d.map.edges} />
 
-      <h2 className="mono h2 spaced">YOUR LAST 12 WEEKS</h2>
+      <h2 className="mono h2 spaced">YOUR LAST 16 WEEKS</h2>
       <Calendar days={d.calendar} today={d.today} />
-      <p className="tiny muted">{d.calendar.length} of the last 84 days read.</p>
+      <p className="tiny muted">{d.calendar.length} of the last 112 days read.</p>
     </section>
   )
 }

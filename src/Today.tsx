@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api, errText, type Idea, type Quiz, type Today as TodayData } from './api'
 import { StoryCard } from './StoryCard'
 import type { Page } from './App'
@@ -46,11 +46,13 @@ export function Today({ data, aiReady, reload, go }: Props) {
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
   const unread = total - data.read_count
+  const [name, setName] = useState('')
+  useEffect(() => { api.getName().then(setName).catch(() => {}) }, [])
 
   return (
     <div className="today">
       <div className="greet">
-        <span className="greet-hi">{greeting}.</span>{' '}
+        <span className="greet-hi">{greeting}{name ? `, ${name}` : ''}.</span>{' '}
         <span className="muted">
           {total === 0 ? 'Press Refresh to load the news.' : unread === 0 ? "You're all caught up." : `${unread} ${unread === 1 ? 'story' : 'stories'} to read`}
           {data.new_today > 0 && ` · +${data.new_today} new stories today`}

@@ -1,24 +1,29 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, errText, type Today as TodayData } from './api'
 import { Today } from './Today'
-import { BacklogPage, BuiltPage, GlossaryPage, IntelPage, ProjectPage, RadarPage, RecapPage, SettingsPage, WatchlistPage } from './pages'
+import { ActorsPage, AffectedPage, BacklogPage, BuiltPage, GlossaryPage, ProjectPage, RadarPage, RecapPage, SettingsPage, WatchlistPage } from './pages'
 import { LiveOpsPage } from './LiveOps'
+import { DevelopingPage, LabPackPage, SystemsPage } from './ops'
 import { loadAnimations } from './prefs'
 import { briefScript, playParts, stopSpeaking, unlockAudio } from './listen'
 
-export type Page = 'today' | 'project' | 'backlog' | 'built' | 'recap' | 'radar' | 'glossary' | 'intel' | 'liveops' | 'watchlist' | 'settings'
+export type Page = 'today' | 'project' | 'backlog' | 'built' | 'recap' | 'radar' | 'glossary' | 'developing' | 'actors' | 'affected' | 'labpack' | 'systems' | 'liveops' | 'watchlist' | 'settings'
 
-const NAV: { id: Page; label: string; group?: 'top' | 'mid' | 'bottom' }[] = [
+const NAV: { id: Page; label: string; group?: 'top' | 'mid' | 'learn' | 'bottom' }[] = [
   { id: 'today', label: 'TODAY', group: 'top' },
   { id: 'liveops', label: 'LIVE OPS', group: 'top' },
   { id: 'project', label: 'PROJECT OF WEEK', group: 'top' },
   { id: 'backlog', label: 'BACKLOG', group: 'top' },
   { id: 'built', label: 'BUILT', group: 'top' },
-  { id: 'recap', label: 'WEEKLY RECAP', group: 'mid' },
-  { id: 'radar', label: 'SKILLS RADAR', group: 'mid' },
-  { id: 'intel', label: 'INTEL', group: 'mid' },
-  { id: 'glossary', label: 'GLOSSARY', group: 'mid' },
+  { id: 'developing', label: 'DEVELOPING', group: 'mid' },
+  { id: 'actors', label: 'THREAT ACTORS', group: 'mid' },
+  { id: 'affected', label: 'AM I AFFECTED?', group: 'mid' },
+  { id: 'labpack', label: 'LAB PACK', group: 'mid' },
+  { id: 'recap', label: 'SUNDAY SITREP', group: 'learn' },
+  { id: 'radar', label: 'SKILLS RADAR', group: 'learn' },
+  { id: 'glossary', label: 'GLOSSARY', group: 'learn' },
   { id: 'watchlist', label: 'WATCHLIST', group: 'bottom' },
+  { id: 'systems', label: 'SYSTEMS', group: 'bottom' },
   { id: 'settings', label: 'SETTINGS', group: 'bottom' },
 ]
 
@@ -37,6 +42,7 @@ export default function App() {
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<string | null>(null)
   const [speaking, setSpeaking] = useState(false)
+  const [sourceCount, setSourceCount] = useState(0)
   const enhancing = useRef(false)
 
   const reload = useCallback(async () => {
@@ -101,6 +107,7 @@ export default function App() {
 
   useEffect(() => {
     void loadAnimations()
+    api.sources().then((s) => setSourceCount(s.length)).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -132,6 +139,7 @@ export default function App() {
           <span className="mono brand-name">SITREP</span>
         </div>
         <div className="mono small muted">{date}</div>
+        {sourceCount > 0 && <div className="mono small live"><span className="dot live-dot" />LIVE · {sourceCount} SOURCES</div>}
         <div className="spacer" />
         <div className="mono small muted sync"><span className={`dot ${busy ? 'dot-busy' : ''}`} />{busy ? 'SYNCING…' : syncText(today?.last_sync ?? 0)}</div>
         <button type="button" className="btn" disabled={busy} onClick={() => void refresh(true)}>Refresh</button>
@@ -167,7 +175,11 @@ export default function App() {
           {page === 'recap' && <RecapPage />}
           {page === 'radar' && <RadarPage />}
           {page === 'glossary' && <GlossaryPage />}
-          {page === 'intel' && <IntelPage />}
+          {page === 'developing' && <DevelopingPage />}
+          {page === 'actors' && <ActorsPage />}
+          {page === 'affected' && <AffectedPage />}
+          {page === 'labpack' && <LabPackPage />}
+          {page === 'systems' && <SystemsPage />}
           {page === 'liveops' && <LiveOpsPage onOpenStory={() => setPage('today')} />}
           {page === 'watchlist' && <WatchlistPage onChange={() => void reload()} />}
           {page === 'settings' && <SettingsPage onAiChange={() => void checkAi()} />}

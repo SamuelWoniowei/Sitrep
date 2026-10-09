@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { playParts, unlockAudio } from './listen'
 import { animationsOn, setAnimations } from './prefs'
-import { api, errText, type AiStatus, type UpdateInfo, type BuiltItem, type Idea, type Project, type RadarRow, type Recap, type GlossEntry, type ActorSeen, type ExposureResult, type VoiceStatus } from './api'
+import { api, errText, type AiStatus, type UpdateInfo, type BuiltItem, type Idea, type Project, type RadarRow, type Recap, type GlossEntry, type ActorSeen, type ExposureResult, type VoiceStatus, type WatchRow } from './api'
 
 function useLoad<T>(fn: () => Promise<T>): [T | null, (v: T) => void, string | null, () => void] {
   const [data, setData] = useState<T | null>(null)
@@ -131,7 +131,7 @@ export function RecapPage() {
   if (!r) return <div className="muted">Loading…</div>
   return (
     <section className="panel page">
-      <h1 className="h1">Weekly recap</h1>
+      <h1 className="h1">Sunday Sitrep</h1>
       <button
         type="button"
         className="btn"
@@ -230,8 +230,7 @@ export function GlossaryPage() {
   )
 }
 
-export function IntelPage() {
-  const [actors, , err] = useLoad<ActorSeen[]>(api.actors)
+export function AffectedPage() {
   const [exp, setExp] = useState<ExposureResult | null>(null)
   const [busy, setBusy] = useState(false)
   const [e2, setE2] = useState<string | null>(null)
@@ -242,8 +241,7 @@ export function IntelPage() {
   }
   return (
     <section className="panel page">
-      <h1 className="h1">Intel</h1>
-
+      <h1 className="h1">Am I affected?</h1>
       <div className="card">
       <h2 className="mono h2 spaced">AM I AFFECTED?</h2>
       <p className="small muted">Looks at the list of programs installed on this PC and compares their names with flaws attackers have recently started exploiting (CISA's list, last 90 days). It only reads names, keeps nothing, and sends nothing anywhere. It cannot check version numbers, so a match means "worth checking you are fully updated".</p>
@@ -265,35 +263,55 @@ export function IntelPage() {
       )}
       </div>
 
-      <div className="card card-rest">
-      <h2 className="mono h2 spaced">THREAT ACTORS IN THE NEWS (14 DAYS)</h2>
+    </section>
+  )
+}
+
+export function ActorsPage() {
+  const [actors, , err] = useLoad<ActorSeen[]>(api.actors)
+  return (
+    <section className="panel page">
+      <h1 className="h1">Threat actors</h1>
+      <p className="muted small">Known groups named in stories over the last 14 days. These are public profiles, kept short; attribution is always the reporters' and vendors' judgement.</p>
       {err && <div className="error">{err}</div>}
       {actors && actors.length === 0 && <p className="small muted">No known groups named in recent stories.</p>}
-      <div className="cols-2">
       {actors?.map((a) => (
-        <div key={a.name} className="row">
-          <div><strong>{a.name}</strong> <span className={`tag ${a.kind === 'Criminal' ? 'tag-amber' : 'tag-blue'}`}>{a.kind.toUpperCase()}</span> <span className="muted small">{a.origin} · {a.stories.length} {a.stories.length === 1 ? 'story' : 'stories'}</span></div>
+        <div key={a.name} className="card actor">
+          <div><strong className="actor-name">{a.name}</strong> <span className={`tag ${a.kind === 'Criminal' ? 'tag-amber' : 'tag-blue'}`}>{a.kind.toUpperCase()}</span></div>
+          <div className="small muted">{a.origin} · {a.stories.length} {a.stories.length === 1 ? 'story' : 'stories'} in 14 days</div>
           <div className="small">{a.blurb}</div>
+          <div className="mono tiny accent">WHAT THEY WANT</div>
+          <div className="small">{a.wants}</div>
+          <div className="mono tiny accent">HOW THEY OPERATE</div>
+          <div className="small">{a.how}</div>
+          <div className="mono tiny muted">IN THE NEWS</div>
           <ul className="small muted plain-list">
             {a.stories.slice(0, 3).map(([id, t]) => <li key={id}>{t}</li>)}
           </ul>
         </div>
       ))}
-      </div>
-      </div>
     </section>
   )
 }
 
+function Spark({ v }: { v: number[] }) {
+  const max = Math.max(1, ...v)
+  return (
+    <div className="spark" role="img" aria-label={`Mentions per day for the last 14 days: ${v.join(', ')}`}>
+      {v.map((n, i) => <span key={i} className="spark-bar" style={{ height: `${Math.max(8, (n / max) * 100)}%`, opacity: n ? 1 : 0.25 }} />)}
+    </div>
+  )
+}
+
 export function WatchlistPage({ onChange }: { onChange: () => void }) {
-  const [list, setList, err] = useLoad<string[]>(api.watchlist)
+  const [rows, setRows, err, reload] = useLoad<WatchRow[]>(api.watchBoard)
   const [term, setTerm] = useState('')
   const [e2, setE2] = useState<string | null>(null)
-  const add = () => api.addWatch(term).then((l) => { setList(l); setTerm(''); setE2(null); onChange() }).catch((e) => setE2(errText(e)))
+  const add = () => api.addWatch(term).then(() => { setTerm(''); setE2(null); reload(); onChange() }).catch((e) => setE2(errText(e)))
   return (
     <section className="panel page">
-      <h1 className="h1">Watchlist</h1>
-      <p className="muted small">Vendors and tech you care about. Matching stories rank higher and get a watchlist tag. Stored only on this computer.</p>
+      <h1 className="h1">Watchlist board</h1>
+      <p className="muted small">Vendors and tech you care about. Matching stories rank higher and get a watchlist tag. Each card shows the last 30 days. Stored only on this computer.</p>
       <form className="ask" onSubmit={(e) => { e.preventDefault(); void add() }}>
         <label className="ask-field">
           <span className="mono small muted">ADD</span>
@@ -302,15 +320,21 @@ export function WatchlistPage({ onChange }: { onChange: () => void }) {
         <button type="submit" className="btn btn-primary" disabled={!term.trim()}>Add</button>
       </form>
       {(err || e2) && <div className="error">{err || e2}</div>}
-      <div className="chips">
-        {list?.map((t) => (
-          <span key={t} className="chip chip-static">
-            {t}
-            <button type="button" className="chip-x" aria-label={`Remove ${t}`} onClick={() => api.removeWatch(t).then((l) => { setList(l); onChange() })}>✕</button>
-          </span>
-        ))}
-        {list?.length === 0 && <span className="muted small">Empty. Try: microsoft, fortinet, wazuh, cloud.</span>}
-      </div>
+      {rows?.length === 0 && <span className="muted small">Empty. Try: microsoft, fortinet, wazuh, cloud.</span>}
+      {rows?.map((r) => (
+        <div key={r.term} className="card watch">
+          <div className="panel-head">
+            <strong className="actor-name">{r.term}</strong>
+            <button type="button" className="chip-x" aria-label={`Remove ${r.term}`} onClick={() => api.removeWatch(r.term).then(() => { setRows(rows.filter((x) => x.term !== r.term)); onChange() })}>✕</button>
+          </div>
+          <div className="watch-n"><span className={r.total ? 'accent' : 'muted'}>{r.total}</span> <span className="small muted">{r.total === 1 ? 'story' : 'stories'} in 30 days</span></div>
+          <Spark v={r.per_day} />
+          <div className="mono tiny muted">LAST 14 DAYS</div>
+          {r.latest.length === 0
+            ? <div className="small muted">Quiet. Nothing recent.</div>
+            : <ul className="small plain-list">{r.latest.map(([id, t]) => <li key={id}><button type="button" className="linkish" onClick={() => void api.openStory(id)}>{t}</button></li>)}</ul>}
+        </div>
+      ))}
     </section>
   )
 }
@@ -354,6 +378,26 @@ function UpdatesSection() {
         )}
       </div>
       {err && <div className="error">{err}</div>}
+    </>
+  )
+}
+
+function NameSection() {
+  const [name, setName, err] = useLoad<string>(api.getName)
+  const [msg, setMsg] = useState('')
+  const save = () => api.setName(name ?? '').then((n) => { setName(n); setMsg('Saved.') }).catch((e) => setMsg(errText(e)))
+  return (
+    <>
+      <h2 className="mono h2 spaced">YOU</h2>
+      <p className="small muted">Your first name, for the greeting on Today. Stored only on this computer.</p>
+      <form className="ask" onSubmit={(e) => { e.preventDefault(); void save() }}>
+        <label className="ask-field">
+          <span className="mono small muted">NAME</span>
+          <input type="text" value={name ?? ''} maxLength={30} onChange={(e) => { setName(e.target.value); setMsg('') }} placeholder="e.g. Sam" />
+        </label>
+        <button type="submit" className="btn">Save</button>
+      </form>
+      {(err || msg) && <p className="small muted">{err ?? msg}</p>}
     </>
   )
 }
@@ -504,6 +548,8 @@ export function SettingsPage({ onAiChange }: { onAiChange: () => void }) {
       )}
       {e2 && <div className="error">{e2}</div>}
       </div>
+
+      <div className="card"><NameSection /></div>
 
       <div className="card"><FocusSection /></div>
 
