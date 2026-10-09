@@ -69,6 +69,41 @@ pub fn truncate_chars(s: &str, max: usize) -> String {
     t
 }
 
+/// Remove the "read more" tails that blog feeds append to excerpts, e.g.
+/// "… [...]", "[…]", "Read more", "The post X appeared first on Y."
+pub fn strip_feed_boilerplate(s: &str) -> String {
+    let mut t = s.trim().to_string();
+    if let Some(i) = t
+        .find("The post ")
+        .filter(|&i| t[i..].contains(" appeared first on "))
+    {
+        t.truncate(i);
+        t = t.trim_end().to_string();
+    }
+    loop {
+        let before = t.len();
+        for tail in [
+            "[...]",
+            "[…]",
+            "[&#8230;]",
+            "...",
+            "…",
+            "Read more",
+            "Continue reading",
+            "Read More",
+        ] {
+            if t.ends_with(tail) {
+                t.truncate(t.len() - tail.len());
+                t = t.trim_end().to_string();
+            }
+        }
+        if t.len() == before {
+            break;
+        }
+    }
+    t
+}
+
 /// First `n` sentences of a plain-text string (best effort).
 pub fn first_sentences(s: &str, n: usize) -> String {
     let mut out = String::new();
@@ -239,6 +274,23 @@ mod tests {
     fn truncates_by_chars_not_bytes() {
         let s = to_plain("ééééééééé", 4);
         assert_eq!(s.chars().count(), 4);
+    }
+
+    #[test]
+    fn feed_boilerplate_removed() {
+        assert_eq!(
+            strip_feed_boilerplate("Patched on Tuesday, three days ago. [...]"),
+            "Patched on Tuesday, three days ago."
+        );
+        assert_eq!(
+            strip_feed_boilerplate("A flaw was found […]"),
+            "A flaw was found"
+        );
+        assert_eq!(
+            strip_feed_boilerplate("Big news here. The post Big news appeared first on Some Blog."),
+            "Big news here."
+        );
+        assert_eq!(strip_feed_boilerplate("Plain summary."), "Plain summary.");
     }
 
     #[test]

@@ -47,7 +47,7 @@ Details: [threat model](docs/THREAT_MODEL.md), [security testing](docs/SECURITY_
 
 ## Install (Windows)
 
-1. Go to [Releases](../../releases) and download the latest `Sitrep_x.y.z_x64-setup.exe`.
+1. Go to [Releases](../../releases) and download the latest `Sitrep_x.y.z_x64-setup.exe`, and check its hash against `SHA256SUMS.txt` with `Get-FileHash`.
 2. Run it. Windows SmartScreen may warn that the app is unrecognised, because the installer isn't code-signed yet. Choose **More info → Run anyway**.
 3. Open Sitrep from the Start menu. It fetches the news on first launch.
 
@@ -60,6 +60,15 @@ Sitrep works without AI and uses each source's own summary. For plain-English re
 3. Restart Sitrep, or click **Settings → Check again**.
 
 A machine with 8 GB+ RAM is recommended. Larger models (e.g. `llama3.1:8b`) give better summaries if your PC can run them, and you can pick one in Settings.
+
+## Updates
+
+Sitrep never checks for updates on its own. When you want to update, open **Settings → Check for updates**. Updates come only from this repository's GitHub Releases and must carry a valid signature from the project's signing key, or they are refused.
+
+For maintainers, releasing a new version:
+1. Bump the version in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`, then push.
+2. Actions → **Release** → Run workflow. It runs the tests, builds, signs and creates a **draft** release with `SHA256SUMS.txt`.
+3. Review the draft and click **Publish**. Only published releases are offered to the app.
 
 ## Build from source
 
@@ -102,7 +111,7 @@ More detail is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 ## Roadmap
 
 - macOS build
-- Code-signed Windows installer
+- Code-signed Windows installer (SignPath for open source)
 - System tray and a morning notification
 - Optional cloud AI (bring your own key, stored in the OS keychain)
 - Export a finished project as a GitHub-ready write-up

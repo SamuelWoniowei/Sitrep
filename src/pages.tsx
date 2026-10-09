@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api, errText, type AiStatus, type BuiltItem, type Idea, type Project, type RadarRow, type Recap, type Term } from './api'
+import { api, errText, type AiStatus, type UpdateInfo, type BuiltItem, type Idea, type Project, type RadarRow, type Recap, type Term } from './api'
 
 function useLoad<T>(fn: () => Promise<T>): [T | null, (v: T) => void, string | null, () => void] {
   const [data, setData] = useState<T | null>(null)
@@ -229,6 +229,49 @@ export function WatchlistPage({ onChange }: { onChange: () => void }) {
   )
 }
 
+function UpdatesSection() {
+  const [version, setVersion] = useState('')
+  const [info, setInfo] = useState<UpdateInfo | null>(null)
+  const [busy, setBusy] = useState<'checking' | 'installing' | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  useEffect(() => { api.appVersion().then(setVersion).catch(() => {}) }, [])
+  const check = () => {
+    setBusy('checking'); setErr(null)
+    api.checkUpdate().then(setInfo).catch((e) => setErr(errText(e))).finally(() => setBusy(null))
+  }
+  const install = () => {
+    setBusy('installing'); setErr(null)
+    api.installUpdate().catch((e) => { setErr(errText(e)); setBusy(null) })
+  }
+  return (
+    <>
+      <h2 className="mono h2 spaced">UPDATES</h2>
+      <p className="small">Installed version: <span className="mono">{version || '…'}</span></p>
+      <p className="tiny muted">
+        Sitrep never checks by itself. Updates come only from this project's GitHub Releases, and each one must carry a valid signature or it is refused.
+      </p>
+      {info && !info.available && <p className="small accent">You're on the latest version.</p>}
+      {info?.available && (
+        <div className="why">
+          <strong>Version {info.available} is available.</strong>
+          {info.notes && <div className="small muted" style={{ whiteSpace: 'pre-line', marginTop: 6 }}>{info.notes}</div>}
+        </div>
+      )}
+      <div className="actions" style={{ justifyContent: 'flex-start' }}>
+        <button type="button" className="btn" disabled={busy !== null} onClick={check}>
+          {busy === 'checking' ? 'Checking…' : 'Check for updates'}
+        </button>
+        {info?.available && (
+          <button type="button" className="btn btn-primary" disabled={busy !== null} onClick={install}>
+            {busy === 'installing' ? 'Installing… Sitrep will restart' : `Install ${info.available}`}
+          </button>
+        )}
+      </div>
+      {err && <div className="error">{err}</div>}
+    </>
+  )
+}
+
 export function SettingsPage({ onAiChange }: { onAiChange: () => void }) {
   const [ai, setAi, err, reloadAi] = useLoad<AiStatus>(api.aiStatus)
   const [sources] = useLoad(api.sources)
@@ -278,10 +321,12 @@ export function SettingsPage({ onAiChange }: { onAiChange: () => void }) {
           <p className="tiny muted">
             Only fetched from the same five news sites as the feeds, never from other links. Cloud models are always blocked.
           </p>
-          <button type="button" className="btn" onClick={reloadAi}>Check again</button>
+          <button type="button" className="btn" onClick={() => { reloadAi(); onAiChange() }}>Check again</button>
         </>
       )}
       {e2 && <div className="error">{e2}</div>}
+
+      <UpdatesSection />
 
       <h2 className="mono h2 spaced">PRIVACY</h2>
       <ul className="small muted plain-list">

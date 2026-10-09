@@ -94,6 +94,7 @@ export interface Recap {
 
 export interface BuiltItem { week: string; title: string; theme: string; completed_at: number }
 export interface AiStatus { running: boolean; enabled: boolean; models: string[]; model: string; full_articles: boolean }
+export interface UpdateInfo { current: string; available: string | null; notes: string | null }
 export interface RefreshResult { new_stories: number; failed: string[]; skipped: boolean }
 
 export const api = {
@@ -122,6 +123,9 @@ export const api = {
   watchlist: () => invoke<string[]>('get_watchlist'),
   addWatch: (term: string) => invoke<string[]>('add_watch', { term }),
   removeWatch: (term: string) => invoke<string[]>('remove_watch', { term }),
+  appVersion: () => invoke<string>('app_version'),
+  checkUpdate: () => invoke<UpdateInfo>('check_update'),
+  installUpdate: () => invoke<void>('install_update'),
   sources: () => invoke<{ name: string; url: string }[]>('list_sources'),
 }
 
