@@ -72,6 +72,7 @@ impl Store {
                cve TEXT PRIMARY KEY, vendor TEXT, product TEXT, name TEXT, date_added TEXT,
                description TEXT, ransomware INTEGER NOT NULL DEFAULT 0);
              CREATE TABLE IF NOT EXISTS ai(story_id TEXT PRIMARY KEY, json TEXT NOT NULL, model TEXT, created INTEGER);
+             CREATE TABLE IF NOT EXISTS articles(story_id TEXT PRIMARY KEY, text TEXT NOT NULL, fetched INTEGER NOT NULL);
              CREATE TABLE IF NOT EXISTS briefs(day TEXT PRIMARY KEY, ids TEXT NOT NULL);
              CREATE TABLE IF NOT EXISTS reads(day TEXT NOT NULL, story_id TEXT NOT NULL, PRIMARY KEY(day, story_id));
              CREATE TABLE IF NOT EXISTS ideas(
@@ -193,6 +194,10 @@ impl Store {
     pub fn prune(&self, now: i64) -> rusqlite::Result<()> {
         let cutoff = now - RETENTION_DAYS * DAY;
         self.conn.execute(
+            "DELETE FROM articles WHERE story_id IN (SELECT id FROM stories WHERE published<?1)",
+            params![cutoff],
+        )?;
+        self.conn.execute(
             "DELETE FROM ai WHERE story_id IN (SELECT id FROM stories WHERE published<?1)",
             params![cutoff],
         )?;
@@ -265,6 +270,26 @@ impl Store {
         self.conn.execute(
             "INSERT OR REPLACE INTO ai(story_id,json,model,created) VALUES(?1,?2,?3,?4)",
             params![story_id, value, model, now],
+        )?;
+        Ok(())
+    }
+
+    // ---------- full article text ----------
+    pub fn article(&self, story_id: &str) -> Option<String> {
+        self.conn
+            .query_row(
+                "SELECT text FROM articles WHERE story_id=?1",
+                params![story_id],
+                |r| r.get(0),
+            )
+            .optional()
+            .ok()
+            .flatten()
+    }
+    pub fn set_article(&self, story_id: &str, text: &str, now: i64) -> rusqlite::Result<()> {
+        self.conn.execute(
+            "INSERT OR REPLACE INTO articles(story_id,text,fetched) VALUES(?1,?2,?3)",
+            params![story_id, text, now],
         )?;
         Ok(())
     }

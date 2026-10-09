@@ -19,6 +19,7 @@ pub struct AppState {
     pub store: Mutex<Store>,
     pub feed_client: reqwest::Client,
     pub ai_client: reqwest::Client,
+    pub article_client: reqwest::Client,
 }
 
 type Res<T> = Result<T, String>;
@@ -246,6 +247,7 @@ pub struct AiStatus {
     pub enabled: bool,
     pub models: Vec<String>,
     pub model: String,
+    pub full_articles: bool,
 }
 
 async fn ai_model(state: &AppState) -> Res<String> {
@@ -262,7 +264,8 @@ async fn ai_model(state: &AppState) -> Res<String> {
     }
     let models = ai::list_models(&state.ai_client).await?;
     // Only ever use a model that is actually installed locally.
-    if models.contains(&wanted) {
+    // list_models never returns cloud models; this check is defence in depth.
+    if models.contains(&wanted) && !ai::is_cloud_model(&wanted) {
         Ok(wanted)
     } else {
         models
@@ -274,12 +277,13 @@ async fn ai_model(state: &AppState) -> Res<String> {
 
 #[tauri::command]
 pub async fn ai_status(state: State<'_, AppState>) -> Res<AiStatus> {
-    let (enabled, model) = {
+    let (enabled, model, full_articles) = {
         let s = lock(&state)?;
         (
             s.setting("ai_enabled").as_deref() != Some("0"),
             s.setting("ai_model")
                 .unwrap_or_else(|| ai::DEFAULT_MODEL.into()),
+            s.setting("full_articles").as_deref() != Some("0"),
         )
     };
     match ai::list_models(&state.ai_client).await {
@@ -288,12 +292,14 @@ pub async fn ai_status(state: State<'_, AppState>) -> Res<AiStatus> {
             enabled,
             models,
             model,
+            full_articles,
         }),
         Err(_) => Ok(AiStatus {
             running: false,
             enabled,
             models: vec![],
             model,
+            full_articles,
         }),
     }
 }
@@ -307,10 +313,62 @@ pub fn set_ai(state: State<'_, AppState>, enabled: bool, model: String) -> Res<(
     {
         return Err("invalid model name".into());
     }
+    if ai::is_cloud_model(&model) {
+        return Err(
+            "Cloud models are blocked: they would send your data off this computer.".into(),
+        );
+    }
     let s = lock(&state)?;
     s.set_setting("ai_enabled", if enabled { "1" } else { "0" })
         .map_err(|e| e.to_string())?;
     s.set_setting("ai_model", &model).map_err(|e| e.to_string())
+}
+
+/// The best text available for a story: the full article if fetching is
+/// enabled and the link is on an allowlisted news site, else the feed summary.
+async fn article_text(state: &AppState, story: &crate::store::StoryRow) -> String {
+    let (enabled, cached) = match lock(state) {
+        Ok(s) => (
+            s.setting("full_articles").as_deref() != Some("0"),
+            s.article(&story.id),
+        ),
+        Err(_) => return story.summary.clone(),
+    };
+    if let Some(t) = cached {
+        return pick_body(&t, &story.summary);
+    }
+    let Some(link) = story.link.as_deref() else {
+        return story.summary.clone();
+    };
+    let allowed = url::Url::parse(link)
+        .map(|u| net::article_fetchable(&u))
+        .unwrap_or(false);
+    if !enabled || !allowed {
+        return story.summary.clone();
+    }
+    let Ok(bytes) = net::fetch_article(&state.article_client, link).await else {
+        return story.summary.clone();
+    };
+    let text = crate::text::extract_article(&String::from_utf8_lossy(&bytes));
+    if let Ok(s) = lock(state) {
+        let _ = s.set_article(&story.id, &text, now());
+    }
+    pick_body(&text, &story.summary)
+}
+
+fn pick_body(article: &str, summary: &str) -> String {
+    if article.chars().count() > summary.chars().count() {
+        article.to_string()
+    } else {
+        summary.to_string()
+    }
+}
+
+#[tauri::command]
+pub fn set_full_articles(state: State<'_, AppState>, enabled: bool) -> Res<()> {
+    lock(&state)?
+        .set_setting("full_articles", if enabled { "1" } else { "0" })
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -337,8 +395,9 @@ pub async fn enhance_story(state: State<'_, AppState>, id: String) -> Res<StoryC
         (st, s.watchlist().unwrap_or_default())
     };
     let model = ai_model(&state).await?;
+    let body = article_text(&state, &story).await;
     let n = ai::nonce();
-    let prompt = ai::summary_prompt(&n, &story.title, &story.summary, &watch);
+    let prompt = ai::summary_prompt(&n, &story.title, &body, &watch);
     let raw = ai::generate(&state.ai_client, &model, &prompt).await?;
     let summary: AiSummary = ai::validate_summary(&raw)
         .ok_or("The AI gave an unusable answer; showing the source summary instead.")?;
@@ -533,6 +592,15 @@ mod tests {
         assert!(clean_watch_term(&"a".repeat(41)).is_err());
         assert!(clean_watch_term("x'); DROP TABLE watchlist;--").is_err());
         assert_eq!(clean_watch_term("<b>wazuh</b>").unwrap(), "wazuh");
+    }
+
+    #[test]
+    fn longer_text_wins() {
+        assert_eq!(
+            pick_body("a long full article body", "short"),
+            "a long full article body"
+        );
+        assert_eq!(pick_body("", "feed summary"), "feed summary");
     }
 
     #[test]

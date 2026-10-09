@@ -139,6 +139,68 @@ pub fn feed_client() -> reqwest::Result<Client> {
         .build()
 }
 
+/// Full articles may only be fetched from these exact hosts: the sites whose
+/// feeds Sitrep already reads. A link anywhere else is never fetched, only
+/// opened in the browser if the user clicks "Read source".
+pub const ARTICLE_HOSTS: &[&str] = &[
+    "www.bleepingcomputer.com",
+    "therecord.media",
+    "thehackernews.com",
+    "www.ncsc.gov.uk",
+    "isc.sans.edu",
+];
+pub const MAX_ARTICLE_BYTES: usize = 2 * 1024 * 1024;
+
+pub fn article_fetchable(url: &Url) -> bool {
+    url.scheme() == "https"
+        && url.username().is_empty()
+        && url.password().is_none()
+        && url.port().map(|p| p == 443).unwrap_or(true)
+        && matches!(url.host(), Some(url::Host::Domain(d)) if ARTICLE_HOSTS.contains(&d.to_ascii_lowercase().as_str()))
+}
+
+pub fn article_client() -> reqwest::Result<Client> {
+    Client::builder()
+        .https_only(true)
+        .user_agent(USER_AGENT)
+        .timeout(Duration::from_secs(20))
+        .connect_timeout(Duration::from_secs(10))
+        .redirect(redirect::Policy::custom(|attempt| {
+            if attempt.previous().len() >= 3 || !article_fetchable(attempt.url()) {
+                attempt.stop()
+            } else {
+                attempt.follow()
+            }
+        }))
+        .build()
+}
+
+/// Fetch an article page. Only HTML from an allowlisted article host, capped
+/// in size; anything else is refused.
+pub async fn fetch_article(client: &Client, raw: &str) -> Result<Vec<u8>, String> {
+    let url = Url::parse(raw).map_err(|e| e.to_string())?;
+    if !article_fetchable(&url) {
+        return Err("article host not allowed".into());
+    }
+    let resp = client.get(url).send().await.map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!("HTTP {}", resp.status()));
+    }
+    if !article_fetchable(resp.url()) {
+        return Err("redirected outside allowlist".into());
+    }
+    let html = resp
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .map(|ct| ct.to_ascii_lowercase().starts_with("text/html"))
+        .unwrap_or(false);
+    if !html {
+        return Err("not an HTML page".into());
+    }
+    read_capped(resp, MAX_ARTICLE_BYTES).await
+}
+
 pub fn ai_client() -> reqwest::Result<Client> {
     Client::builder()
         .no_proxy()
@@ -267,6 +329,45 @@ mod tests {
             .await
             .unwrap_err();
         assert_eq!(err, "source not allowed");
+    }
+
+    #[test]
+    fn article_allowlist_is_strict() {
+        for ok in [
+            "https://www.bleepingcomputer.com/news/security/x/",
+            "https://therecord.media/some-story",
+            "https://thehackernews.com/2026/10/x.html",
+            "https://www.ncsc.gov.uk/news/x",
+            "https://isc.sans.edu/diary/12345",
+        ] {
+            assert!(article_fetchable(&Url::parse(ok).unwrap()), "{ok}");
+        }
+        for bad in [
+            "http://therecord.media/x",
+            "https://evil.example/x",
+            "https://therecord.media.evil.example/x",
+            "https://evil-therecord.media/x",
+            "https://user:pw@therecord.media/x",
+            "https://therecord.media:8443/x",
+            "https://feeds.feedburner.com/x",
+            "https://www.cisa.gov/x",
+            "https://127.0.0.1/x",
+            "https://[::1]/x",
+        ] {
+            assert!(!article_fetchable(&Url::parse(bad).unwrap()), "{bad}");
+        }
+    }
+
+    #[tokio::test]
+    async fn fetch_article_refuses_other_hosts() {
+        let c = article_client().unwrap();
+        assert_eq!(
+            fetch_article(&c, "https://evil.example/a")
+                .await
+                .unwrap_err(),
+            "article host not allowed"
+        );
+        assert!(fetch_article(&c, "javascript:alert(1)").await.is_err());
     }
 
     #[test]

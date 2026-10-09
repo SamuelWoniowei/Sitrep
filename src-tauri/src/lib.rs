@@ -28,6 +28,7 @@ pub fn run() {
                 store: Mutex::new(store),
                 feed_client: net::feed_client()?,
                 ai_client: net::ai_client()?,
+                article_client: net::article_client()?,
             });
             Ok(())
         })
@@ -38,6 +39,7 @@ pub fn run() {
             commands::open_story,
             commands::ai_status,
             commands::set_ai,
+            commands::set_full_articles,
             commands::enhance_story,
             commands::ask_story,
             commands::list_ideas,

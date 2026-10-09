@@ -33,7 +33,7 @@ Sitrep is a [Tauri 2](https://v2.tauri.app) desktop app: a Rust backend that doe
 
    It picks 3, with at most 2 per category, and includes a UK story when one exists. The brief is fixed for the day once chosen.
 4. **Ideas**: each brief story with a clear technical theme adds one lab idea to the backlog (cap 10, 21-day expiry unless starred).
-5. **AI (optional)**: the UI asks the backend to enhance each brief story. The backend calls the local Ollama model, validates the JSON reply and caches it. Without AI, the source summary, built-in glossary and templates are used.
+5. **AI (optional)**: the UI asks the backend to enhance each brief story. The backend first fetches the full article if its link is on one of the five allowlisted news hosts (falling back to the feed summary), then calls the local Ollama model (cloud models are refused), validates the JSON reply and caches it. Without AI, the source summary, built-in glossary and templates are used.
 6. **Project of the week**: the dominant theme in the past 7 days selects a project template. It is locked in once there's enough news (5+ stories) or as soon as the user ticks a step.
 
 ## Why these choices

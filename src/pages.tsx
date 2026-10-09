@@ -264,6 +264,20 @@ export function SettingsPage({ onAiChange }: { onAiChange: () => void }) {
               </select>
             </label>
           )}
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={ai.full_articles}
+              onChange={(e) => {
+                const on = e.target.checked
+                api.setFullArticles(on).then(() => setAi({ ...ai, full_articles: on })).catch((er) => setE2(errText(er)))
+              }}
+            />
+            Read the full article for today's 3 stories (better summaries)
+          </label>
+          <p className="tiny muted">
+            Only fetched from the same five news sites as the feeds, never from other links. Cloud models are always blocked.
+          </p>
           <button type="button" className="btn" onClick={reloadAi}>Check again</button>
         </>
       )}
@@ -272,7 +286,8 @@ export function SettingsPage({ onAiChange }: { onAiChange: () => void }) {
       <h2 className="mono h2 spaced">PRIVACY</h2>
       <ul className="small muted plain-list">
         <li>No account, no analytics, no tracking. Your reading history, backlog and watchlist stay in a local database on this computer.</li>
-        <li>The only internet traffic is downloading the public feeds below. The AI runs locally on 127.0.0.1.</li>
+        <li>The only internet traffic is downloading the public feeds below and, if enabled, the full text of today's 3 stories from those same news sites.</li>
+        <li>The AI runs only on this computer (127.0.0.1). Ollama "cloud" models are blocked so article text never leaves your PC.</li>
         <li>Article links open in your normal browser only when you click "Read source".</li>
       </ul>
 

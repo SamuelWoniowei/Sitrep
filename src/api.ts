@@ -93,7 +93,7 @@ export interface Recap {
 }
 
 export interface BuiltItem { week: string; title: string; theme: string; completed_at: number }
-export interface AiStatus { running: boolean; enabled: boolean; models: string[]; model: string }
+export interface AiStatus { running: boolean; enabled: boolean; models: string[]; model: string; full_articles: boolean }
 export interface RefreshResult { new_stories: number; failed: string[]; skipped: boolean }
 
 export const api = {
@@ -103,6 +103,7 @@ export const api = {
   openStory: (id: string) => invoke<void>('open_story', { id }),
   aiStatus: () => invoke<AiStatus>('ai_status'),
   setAi: (enabled: boolean, model: string) => invoke<void>('set_ai', { enabled, model }),
+  setFullArticles: (enabled: boolean) => invoke<void>('set_full_articles', { enabled }),
   enhance: (id: string) => invoke<Story>('enhance_story', { id }),
   ask: (id: string, question: string) => invoke<string>('ask_story', { id, question }),
   ideas: (status: 'active' | 'archived') => invoke<Idea[]>('list_ideas', { status }),
