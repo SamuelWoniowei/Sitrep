@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api, errText, type AiStatus, type UpdateInfo, type BuiltItem, type Idea, type Project, type RadarRow, type Recap, type Term, type VoiceStatus } from './api'
+import { api, errText, type AiStatus, type UpdateInfo, type BuiltItem, type Idea, type Project, type RadarRow, type Recap, type GlossEntry, type ActorSeen, type ExposureResult, type VoiceStatus } from './api'
 
 function useLoad<T>(fn: () => Promise<T>): [T | null, (v: T) => void, string | null, () => void] {
   const [data, setData] = useState<T | null>(null)
@@ -177,22 +177,92 @@ export function RadarPage() {
 }
 
 export function GlossaryPage() {
-  const [terms, , err] = useLoad<Term[]>(api.glossary)
+  const [terms, setTerms, err] = useLoad<GlossEntry[]>(api.glossary)
   const [q, setQ] = useState('')
-  const shown = (terms ?? []).filter((t) => (t.term + t.plain).toLowerCase().includes(q.toLowerCase()))
+  const [tab, setTab] = useState<'new' | 'learning' | 'known' | 'all'>('new')
+  const [e2, setE2] = useState<string | null>(null)
+  const set = (key: string, status: string) => api.setTermStatus(key, status).then(setTerms).catch((e) => setE2(errText(e)))
+  const all = terms ?? []
+  const count = (s: string) => all.filter((t) => t.status === s).length
+  const shown = all
+    .filter((t) => tab === 'all' || t.status === tab)
+    .filter((t) => (t.term + t.plain).toLowerCase().includes(q.toLowerCase()))
   return (
     <section className="panel page">
       <h1 className="h1">Glossary</h1>
+      <p className="small muted">Mark terms as you learn them. Known terms move out of your way. New terms the AI explains in stories are added here (up to 15 at a time) and tidy themselves away after 30 days if untouched.</p>
+      <div className="chips">
+        {(['new', 'learning', 'known', 'all'] as const).map((t) => (
+          <button key={t} type="button" className={`chip ${tab === t ? 'chip-on' : ''}`} aria-pressed={tab === t} onClick={() => setTab(t)}>
+            {t === 'all' ? `All ${all.length}` : `${t[0].toUpperCase()}${t.slice(1)} ${count(t)}`}
+          </button>
+        ))}
+      </div>
       <label className="ask-field">
         <span className="mono small muted">FIND</span>
         <input type="search" value={q} maxLength={60} onChange={(e) => setQ(e.target.value)} placeholder="e.g. lateral" />
       </label>
-      {err && <div className="error">{err}</div>}
+      {(err || e2) && <div className="error">{err ?? e2}</div>}
       {shown.map((t) => (
-        <div key={t.term} className="row">
-          <div><strong>{t.term}</strong></div>
+        <div key={t.key} className="row">
+          <div><strong>{t.term}</strong> {t.origin === 'ai' && <span className="tag tag-ai" title="Explained by your local AI">AI</span>}</div>
           <div className="small">{t.plain}</div>
           {t.analogy && <div className="small muted">Think of it as: {t.analogy}</div>}
+          <div className="actions">
+            {t.status !== 'learning' && <button type="button" className="btn" onClick={() => void set(t.key, 'learning')}>Learning</button>}
+            {t.status !== 'known' && <button type="button" className="btn" onClick={() => void set(t.key, 'known')}>I know this</button>}
+            {t.status !== 'new' && <button type="button" className="btn" onClick={() => void set(t.key, 'new')}>Reset</button>}
+          </div>
+        </div>
+      ))}
+      {terms && shown.length === 0 && <p className="muted small">Nothing here.</p>}
+    </section>
+  )
+}
+
+export function IntelPage() {
+  const [actors, , err] = useLoad<ActorSeen[]>(api.actors)
+  const [exp, setExp] = useState<ExposureResult | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [e2, setE2] = useState<string | null>(null)
+  const check = () => {
+    setBusy(true)
+    setE2(null)
+    api.exposure().then(setExp).catch((e) => setE2(errText(e))).finally(() => setBusy(false))
+  }
+  return (
+    <section className="panel page">
+      <h1 className="h1">Intel</h1>
+
+      <h2 className="mono h2 spaced">AM I AFFECTED?</h2>
+      <p className="small muted">Looks at the list of programs installed on this PC and compares their names with flaws attackers have recently started exploiting (CISA's list, last 90 days). It only reads names, keeps nothing, and sends nothing anywhere. It cannot check version numbers, so a match means "worth checking you are fully updated".</p>
+      <button type="button" className="btn btn-primary" disabled={busy} onClick={check}>{busy ? 'Checking…' : 'Check this PC'}</button>
+      {e2 && <div className="error small">{e2}</div>}
+      {exp && !exp.supported && <p className="small muted">This check only works on Windows.</p>}
+      {exp && exp.supported && (
+        <>
+          <p className="small">{exp.programs} programs checked. {exp.matches.length === 0 ? 'Nothing matched.' : `${exp.matches.length} worth a look:`}</p>
+          {exp.matches.map((m) => (
+            <div key={m.program} className="row">
+              <div><strong>{m.program}</strong> {m.ransomware && <span className="tag tag-red">USED BY RANSOMWARE</span>}</div>
+              <div className="small muted">Matches {m.vendor} {m.product} · latest flaw added {m.latest_added}</div>
+              <div className="mono tiny">{m.cves.join(' · ')}</div>
+              <div className="small">Update it to the newest version, then you're fine.</div>
+            </div>
+          ))}
+        </>
+      )}
+
+      <h2 className="mono h2 spaced">THREAT ACTORS IN THE NEWS (14 DAYS)</h2>
+      {err && <div className="error">{err}</div>}
+      {actors && actors.length === 0 && <p className="small muted">No known groups named in recent stories.</p>}
+      {actors?.map((a) => (
+        <div key={a.name} className="row">
+          <div><strong>{a.name}</strong> <span className={`tag ${a.kind === 'Criminal' ? 'tag-amber' : 'tag-blue'}`}>{a.kind.toUpperCase()}</span> <span className="muted small">{a.origin} · {a.stories.length} {a.stories.length === 1 ? 'story' : 'stories'}</span></div>
+          <div className="small">{a.blurb}</div>
+          <ul className="small muted plain-list">
+            {a.stories.slice(0, 3).map(([id, t]) => <li key={id}>{t}</li>)}
+          </ul>
         </div>
       ))}
     </section>

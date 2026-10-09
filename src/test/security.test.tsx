@@ -24,6 +24,8 @@ const story: Story = {
   plain: evil,
   action: evil,
   roles: [{ role: evil, note: evil }],
+  developing: [{ id: 'x', title: evil, source: evil, published: 1, why: evil }],
+  actors: [evil],
   cvss: [{ cve: evil, score: 9.8, severity: evil, exploited: true }],
   terms: [{ term: evil, plain: evil }],
   cves: [],

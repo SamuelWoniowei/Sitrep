@@ -150,6 +150,8 @@ pub struct StoryCard {
     pub action: String,
     pub roles: Vec<AiRole>,
     pub cvss: Vec<CveScore>,
+    pub developing: Vec<crate::intel::TimelineItem>,
+    pub actors: Vec<&'static str>,
     pub terms: Vec<AiTerm>,
     pub cves: Vec<String>,
     pub watch_hits: Vec<String>,
@@ -238,6 +240,11 @@ pub fn story_card(store: &Store, s: &StoryRow, watch: &[String], read: bool) -> 
                     exploited: store.in_kev(c),
                 })
             })
+            .collect(),
+        developing: crate::intel::developing(store, s),
+        actors: crate::intel::actors_in(&text_of(s))
+            .into_iter()
+            .map(|a| a.name)
             .collect(),
         terms: sum.terms,
         cves: s.cves.clone(),

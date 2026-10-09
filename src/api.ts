@@ -22,6 +22,8 @@ export interface Story {
   action: string
   roles: { role: string; note: string }[]
   cvss: { cve: string; score: number; severity: string; exploited: boolean }[]
+  developing: { id: string; title: string; source: string; published: number; why: string }[]
+  actors: string[]
   terms: { term: string; plain: string }[]
   cves: string[]
   watch_hits: string[]
@@ -29,6 +31,12 @@ export interface Story {
   read: boolean
   has_link: boolean
 }
+
+export interface GlossEntry { key: string; term: string; plain: string; analogy: string; status: 'new' | 'learning' | 'known'; origin: 'builtin' | 'ai' }
+export interface ActorSeen { name: string; kind: string; origin: string; country: string; blurb: string; stories: [string, string][] }
+export interface Exposure { program: string; vendor: string; product: string; cves: string[]; latest_added: string; ransomware: boolean }
+export interface ExposureResult { supported: boolean; programs: number; window_days: number; matches: Exposure[] }
+export interface LabPackResult { folder: string; ips: number; domains: number; hashes: number }
 
 export interface Quiz {
   day: string
@@ -122,7 +130,11 @@ export const api = {
   toggleStep: (step: number) => invoke<Project | null>('toggle_project_step', { step }),
   completeProject: (completed: boolean) => invoke<Project | null>('complete_project', { completed }),
   built: () => invoke<BuiltItem[]>('list_built'),
-  glossary: () => invoke<Term[]>('get_glossary'),
+  glossary: () => invoke<GlossEntry[]>('get_glossary'),
+  setTermStatus: (key: string, status: string) => invoke<GlossEntry[]>('set_term_status', { key, status }),
+  actors: () => invoke<ActorSeen[]>('get_actors'),
+  exposure: () => invoke<ExposureResult>('check_exposure'),
+  labPack: (id: string) => invoke<LabPackResult>('export_lab_pack', { id }),
   answerQuiz: (choice: number) => invoke<Quiz | null>('answer_quiz', { choice }),
   recap: () => invoke<Recap>('get_recap'),
   radar: () => invoke<RadarRow[]>('get_radar'),

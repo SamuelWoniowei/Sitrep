@@ -10,7 +10,8 @@ use tauri_plugin_opener::OpenerExt;
 use crate::ai::{self, AiSummary};
 use crate::core::{self, BuiltItem, ProjectView, QuizView, RadarRow, Recap, StoryCard};
 use crate::feeds;
-use crate::glossary::{self, Term};
+use crate::glossary::Term;
+use crate::intel;
 use crate::net::{self, FeedKind, SOURCES};
 use crate::store::{Idea, Store};
 use crate::text::to_plain;
@@ -464,6 +465,7 @@ pub async fn enhance_story(state: State<'_, AppState>, id: String) -> Res<StoryC
     let summary: AiSummary = ai::validate_summary(&raw)
         .ok_or("The AI gave an unusable answer; showing the source summary instead.")?;
     let s = lock(&state)?;
+    intel::add_ai_terms(&s, &summary.terms, now());
     s.set_ai_json(
         &id,
         &serde_json::to_string(&summary).map_err(|e| e.to_string())?,
@@ -575,10 +577,113 @@ pub fn list_built(state: State<'_, AppState>) -> Res<Vec<BuiltItem>> {
 // ---------------- learning ----------------
 
 #[tauri::command]
-pub fn get_glossary() -> Vec<Term> {
-    let mut v = glossary::TERMS.to_vec();
-    v.sort_by_key(|t| t.term.to_lowercase());
-    v
+pub fn get_glossary(state: State<'_, AppState>) -> Res<Vec<intel::GlossEntry>> {
+    let s = lock(&state)?;
+    let _ = s.gloss_expire(now());
+    Ok(intel::glossary_view(&s))
+}
+
+#[tauri::command]
+pub fn set_term_status(
+    state: State<'_, AppState>,
+    key: String,
+    status: String,
+) -> Res<Vec<intel::GlossEntry>> {
+    if key.len() > 60 || !key.chars().all(|c| c.is_alphanumeric()) {
+        return Err("invalid term".into());
+    }
+    let s = lock(&state)?;
+    intel::set_gloss_status(&s, &key, &status, now())?;
+    Ok(intel::glossary_view(&s))
+}
+
+#[tauri::command]
+pub fn get_actors(state: State<'_, AppState>) -> Res<Vec<intel::ActorSeen>> {
+    Ok(intel::actors_seen(&*lock(&state)?, now() - 14 * 86_400))
+}
+
+#[derive(Serialize)]
+pub struct ExposureResult {
+    pub supported: bool,
+    pub programs: usize,
+    pub window_days: i64,
+    pub matches: Vec<intel::Exposure>,
+}
+
+#[tauri::command]
+pub async fn check_exposure(state: State<'_, AppState>) -> Res<ExposureResult> {
+    let programs = intel::installed_programs().await;
+    let t = now();
+    let since = chrono::DateTime::from_timestamp(t - 90 * 86_400, 0)
+        .map(|d| d.format("%Y-%m-%d").to_string())
+        .unwrap_or_default();
+    let kev = lock(&state)?
+        .kev_recent(&since)
+        .map_err(|e| e.to_string())?;
+    Ok(ExposureResult {
+        supported: !programs.is_empty(),
+        programs: programs.len(),
+        window_days: 90,
+        matches: intel::exposure(&programs, &kev),
+    })
+}
+
+#[derive(Serialize)]
+pub struct LabPackResult {
+    pub folder: String,
+    pub ips: usize,
+    pub domains: usize,
+    pub hashes: usize,
+}
+
+#[tauri::command]
+pub fn export_lab_pack(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    id: String,
+) -> Res<LabPackResult> {
+    use tauri::Manager;
+    valid_story_id(&id)?;
+    let (story, text) = {
+        let s = lock(&state)?;
+        let st = s
+            .story(&id)
+            .map_err(|e| e.to_string())?
+            .ok_or("unknown story")?;
+        let body = s.article(&id).unwrap_or_default();
+        let text = format!("{} {} {}", st.title, st.summary, body);
+        (st, text)
+    };
+    let iocs = intel::extract_iocs(&text);
+    let date = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let files = intel::lab_pack_files(
+        &story.title,
+        story.link.as_deref(),
+        &story.cves,
+        &iocs,
+        &date,
+    );
+    let base = app
+        .path()
+        .document_dir()
+        .or_else(|_| app.path().app_data_dir())
+        .map_err(|e| e.to_string())?;
+    let folder = base
+        .join("Sitrep")
+        .join(format!("lab-pack-{date}-{}", &id[..8]));
+    std::fs::create_dir_all(&folder)
+        .map_err(|_| "Could not create the lab pack folder.".to_string())?;
+    for (name, body) in &files {
+        std::fs::write(folder.join(name), body)
+            .map_err(|_| "Could not write the lab pack.".to_string())?;
+    }
+    let _ = tauri_plugin_opener::reveal_item_in_dir(folder.join("README.md"));
+    Ok(LabPackResult {
+        folder: folder.display().to_string(),
+        ips: iocs.ips.len(),
+        domains: iocs.domains.len(),
+        hashes: iocs.sha256.len() + iocs.md5.len(),
+    })
 }
 #[tauri::command]
 pub fn answer_quiz(state: State<'_, AppState>, choice: i64) -> Res<Option<QuizView>> {

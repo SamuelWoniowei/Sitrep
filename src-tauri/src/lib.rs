@@ -3,6 +3,7 @@ pub mod commands;
 pub mod core;
 pub mod feeds;
 pub mod glossary;
+pub mod intel;
 pub mod net;
 pub mod store;
 pub mod text;
@@ -58,6 +59,10 @@ pub fn run() {
             commands::complete_project,
             commands::list_built,
             commands::get_glossary,
+            commands::set_term_status,
+            commands::get_actors,
+            commands::check_exposure,
+            commands::export_lab_pack,
             commands::answer_quiz,
             commands::get_recap,
             commands::get_radar,
