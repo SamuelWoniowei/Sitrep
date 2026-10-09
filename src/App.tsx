@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, errText, type Today as TodayData } from './api'
 import { Today } from './Today'
 import { BacklogPage, BuiltPage, GlossaryPage, ProjectPage, RadarPage, RecapPage, SettingsPage, WatchlistPage } from './pages'
-import { briefScript, canListen, speak, stopSpeaking } from './listen'
+import { briefScript, speakSystem, speakWithPiper, stopSpeaking } from './listen'
 
 export type Page = 'today' | 'project' | 'backlog' | 'built' | 'recap' | 'radar' | 'glossary' | 'watchlist' | 'settings'
 
@@ -99,15 +99,29 @@ export default function App() {
     if (aiReady && today) void enhance(today)
   }, [aiReady, today?.day, today?.stories.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const listen = () => {
+  const listen = async () => {
     if (speaking) {
       stopSpeaking()
       setSpeaking(false)
       return
     }
     if (!today?.stories.length) return
+    const script = briefScript(today.stories)
+    const done = () => setSpeaking(false)
     setSpeaking(true)
-    speak(briefScript(today.stories), () => setSpeaking(false))
+    try {
+      const v = await api.voiceStatus()
+      if (v.installed) {
+        await speakWithPiper(script, v.sample_rate, done)
+        return
+      }
+    } catch {
+      // fall back to an on-device system voice below
+    }
+    if (!speakSystem(script, done)) {
+      setSpeaking(false)
+      setNote('No private voice found. Install the natural voice in Settings → Voice.')
+    }
   }
 
   const date = new Date().toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()
@@ -124,11 +138,9 @@ export default function App() {
         <div className="spacer" />
         <div className="mono small muted sync"><span className={`dot ${busy ? 'dot-busy' : ''}`} />{busy ? 'SYNCING…' : syncText(today?.last_sync ?? 0)}</div>
         <button type="button" className="btn" disabled={busy} onClick={() => void refresh(true)}>Refresh</button>
-        {canListen() && (
-          <button type="button" className="btn btn-primary" onClick={listen} disabled={!today?.stories.length}>
-            {speaking ? '■ Stop' : `▶ Listen to brief · ${minutes} min`}
-          </button>
-        )}
+        <button type="button" className="btn btn-primary" onClick={() => void listen()} disabled={!today?.stories.length}>
+          {speaking ? '■ Stop' : `▶ Listen to brief · ${minutes} min`}
+        </button>
       </header>
 
       <div className="body">
