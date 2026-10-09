@@ -59,7 +59,7 @@ Sitrep works without AI and uses each source's own summary. For plain-English re
 2. Run `ollama pull llama3.2:3b` in a terminal (about 2 GB, one time).
 3. Restart Sitrep, or click **Settings → Check again**.
 
-A machine with 8 GB+ RAM is recommended. Larger models (e.g. `llama3.1:8b`) give better summaries if your PC can run them, and you can pick one in Settings.
+A machine with 8 GB+ RAM is recommended. Larger models give better summaries if your PC can run them, and you can pick one in Settings: `llama3.1:8b`, `qwen3:8b`, or on 32 GB RAM `qwen3:30b-a3b` (fast for its quality). Sitrep turns off Qwen 3's slow "thinking" mode automatically. Models tagged `cloud` are always blocked.
 
 ## Updates
 

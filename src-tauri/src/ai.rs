@@ -17,6 +17,23 @@ use crate::text::{strip_controls, to_plain};
 pub const OLLAMA: &str = "http://127.0.0.1:11434";
 pub const DEFAULT_MODEL: &str = "llama3.2:3b";
 
+/// Reasoning models (Qwen 3, DeepSeek-R1) "think" before answering by
+/// default, which is slow and unnecessary for short summaries.
+pub fn is_thinking_model(name: &str) -> bool {
+    let n = name.to_ascii_lowercase();
+    ["qwen3", "deepseek-r1", "magistral"]
+        .iter()
+        .any(|p| n.starts_with(p))
+}
+
+/// Drop any <think>…</think> block an older Ollama might leave in the reply.
+pub fn strip_thinking(raw: &str) -> &str {
+    match raw.rfind("</think>") {
+        Some(i) => &raw[i + "</think>".len()..],
+        None => raw,
+    }
+}
+
 /// Ollama can also proxy "cloud" models (e.g. `gemma4:cloud`,
 /// `gpt-oss:120b-cloud`) that run on Ollama's servers. Using one would send
 /// article text and questions off this computer, so Sitrep refuses any model
@@ -88,7 +105,7 @@ Return ONLY a JSON object: {{\"answer\": \"...\"}}",
 
 /// Validate and clean model output. Anything malformed is rejected.
 pub fn validate_summary(raw: &str) -> Option<AiSummary> {
-    let mut s: AiSummary = serde_json::from_str(raw.trim()).ok()?;
+    let mut s: AiSummary = serde_json::from_str(strip_thinking(raw).trim()).ok()?;
     s.headline = to_plain(&s.headline, 160);
     s.tldr = to_plain(&s.tldr, 400);
     s.why = to_plain(&s.why, 300);
@@ -114,7 +131,7 @@ pub fn validate_answer(raw: &str) -> Option<String> {
     struct A {
         answer: String,
     }
-    let a: A = serde_json::from_str(raw.trim()).ok()?;
+    let a: A = serde_json::from_str(strip_thinking(raw).trim()).ok()?;
     let s = to_plain(&a.answer, 1200);
     (!s.is_empty()).then_some(s)
 }
@@ -151,7 +168,7 @@ pub async fn generate(client: &Client, model: &str, prompt: &str) -> Result<Stri
     struct Gen {
         response: String,
     }
-    let body = serde_json::json!({
+    let mut body = serde_json::json!({
         "model": model,
         "system": SYSTEM,
         "prompt": prompt,
@@ -159,6 +176,9 @@ pub async fn generate(client: &Client, model: &str, prompt: &str) -> Result<Stri
         "stream": false,
         "options": { "temperature": 0.2, "num_predict": 700, "num_ctx": 8192 }
     });
+    if is_thinking_model(model) {
+        body["think"] = serde_json::Value::Bool(false);
+    }
     let resp = client
         .post(format!("{OLLAMA}/api/generate"))
         .json(&body)
@@ -199,6 +219,18 @@ mod tests {
         for m in ["llama3.2:3b", "llama3.1:8b", "mistral:7b", "phi3:mini"] {
             assert!(!is_cloud_model(m), "{m}");
         }
+    }
+
+    #[test]
+    fn thinking_models_handled() {
+        assert!(
+            is_thinking_model("qwen3:8b")
+                && is_thinking_model("qwen3:30b-a3b")
+                && is_thinking_model("deepseek-r1:7b")
+        );
+        assert!(!is_thinking_model("llama3.1:8b") && !is_thinking_model("qwen2.5:7b"));
+        let raw = "<think>long reasoning {\"headline\":\"fake\"}</think>\n{\"headline\":\"H\",\"tldr\":\"T\",\"why\":\"W\",\"deeper\":\"D\"}";
+        assert_eq!(validate_summary(raw).unwrap().headline, "H");
     }
 
     #[test]
