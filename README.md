@@ -10,18 +10,18 @@ It's built for people who want to keep up with security without drowning in it, 
 
 ## Features
 
-| | |
-|---|---|
-| **Daily brief** | Three stories a day, ranked: actively exploited flaws first, then major incidents, then UK news. Duplicates across sources are merged. |
-| **Simple / Deeper** | Plain English by default. Switch to Deeper for CVE IDs, technique and technical detail. |
-| **Jargon on tap** | Technical terms appear as chips that explain themselves in one line. A searchable glossary of 35 terms ships offline. |
-| **Listen mode** | Reads the brief aloud with your operating system's built-in voice. |
-| **Ask about a story** | Ask a follow-up question ("How would a SOC detect this?"). Needs the optional local AI. |
-| **Project of the week** | Every Monday, the week's dominant theme becomes one weekend-sized lab project, with steps, tools and a clear "done when". Finished projects go to **Built**. |
-| **Idea backlog** | Each brief adds lab ideas. Capped at 10, and ideas expire after 21 days unless starred. Dismissed ideas go to an archive you can restore from or delete. |
-| **Watchlist** | Add vendors and tech you care about. Matching stories rank higher and get tagged. |
-| **Quick check & weekly recap** | One question a day, plus a Sunday recap of the week's top themes with three questions. Missed terms come back later. |
-| **Skills radar** | What the news covered in the last 30 days, compared with the themes you've built projects on. |
+- **A calm daily brief:** at most three stories a day, ranked by what is being exploited, big incidents, UK relevance and your watchlist.
+- **Fuller summaries:** a 4 to 5 sentence summary (what happened, the weakness, how it worked, impact and fix), a "plain words" version with an analogy, what to do, and notes for the career roles you pick. All written by a local AI (Ollama); nothing leaves your PC.
+- **Simple and Deeper views:** step-by-step storyboard and technical detail on demand.
+- **Smart glossary:** New / Learning / Known, merges duplicates, caps AI-added terms at 15 and tidies old ones away.
+- **Developing stories:** related earlier coverage linked under each story.
+- **Intel:** threat-actor profiles, and "Am I affected?" (matches your installed programs against recently exploited flaws; read-only).
+- **Lab pack:** export draft Suricata rules, Wazuh lists/rules and an IOC CSV for the story, for your home lab.
+- **Live Ops:** interactive globe of countries in the news, flaw lifecycle tracker, groups-and-flaws map, 12-week reading calendar.
+- **Natural British voice (optional):** Piper "Alan", one verified download, then offline. Listen mode never uses online voices.
+- **Weekly project, idea backlog, quiz, recap, skills radar** (from v0.1).
+- **Motion on/off** and automatic reduced-motion support.
+- **Sources:** BleepingComputer, The Record, The Hacker News, NCSC UK, SANS ISC, CISA Advisories, Microsoft MSRC, Cisco Talos, Krebs on Security, CISA KEV, plus NVD severity scores.
 
 ## Privacy
 

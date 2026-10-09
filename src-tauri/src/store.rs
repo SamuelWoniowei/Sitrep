@@ -264,6 +264,27 @@ impl Store {
             .is_some()
     }
 
+    /// (date added, used by ransomware) for a CVE, if it is on the KEV list.
+    pub fn kev_info(&self, cve: &str) -> rusqlite::Result<Option<(String, bool)>> {
+        self.conn
+            .query_row(
+                "SELECT date_added, ransomware FROM kev WHERE cve=?1",
+                params![cve],
+                |r| Ok((r.get(0)?, r.get::<_, i64>(1)? != 0)),
+            )
+            .optional()
+    }
+
+    pub fn count_fetched_since(&self, ts: i64) -> i64 {
+        self.conn
+            .query_row(
+                "SELECT COUNT(*) FROM stories WHERE fetched>=?1",
+                params![ts],
+                |r| r.get(0),
+            )
+            .unwrap_or(0)
+    }
+
     pub fn kev_added_since(&self, date: &str) -> i64 {
         self.conn
             .query_row(

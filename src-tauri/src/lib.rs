@@ -4,6 +4,7 @@ pub mod core;
 pub mod feeds;
 pub mod glossary;
 pub mod intel;
+pub mod liveops;
 pub mod net;
 pub mod store;
 pub mod text;
@@ -61,6 +62,9 @@ pub fn run() {
             commands::get_glossary,
             commands::set_term_status,
             commands::get_actors,
+            commands::get_liveops,
+            commands::get_animations,
+            commands::set_animations,
             commands::check_exposure,
             commands::export_lab_pack,
             commands::answer_quiz,

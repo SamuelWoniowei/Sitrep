@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { playParts } from './listen'
+import { animationsOn, setAnimations } from './prefs'
 import { api, errText, type AiStatus, type UpdateInfo, type BuiltItem, type Idea, type Project, type RadarRow, type Recap, type GlossEntry, type ActorSeen, type ExposureResult, type VoiceStatus } from './api'
 
 function useLoad<T>(fn: () => Promise<T>): [T | null, (v: T) => void, string | null, () => void] {
@@ -129,6 +131,13 @@ export function RecapPage() {
   return (
     <section className="panel page">
       <h1 className="h1">Weekly recap</h1>
+      <button
+        type="button"
+        className="btn"
+        onClick={() => { void playParts([`Your week in security. ${r.story_count} stories.`, ...r.themes.map((t) => `${t.theme}: ${t.count} stories. ${t.examples.slice(0, 2).join('. ')}`)], () => {}) }}
+      >
+        ▶ Listen to the recap
+      </button>
       <p className="muted small">{r.ready ? "It's Sunday: here's your week." : `Preview. The full recap lands in ${r.days_until} days.`} {r.story_count} stories in the last 7 days.</p>
       {r.themes.map((t) => (
         <div key={t.theme} className="row">
@@ -342,6 +351,20 @@ function UpdatesSection() {
   )
 }
 
+function AnimationSection() {
+  const [on, setOn] = useState(animationsOn())
+  return (
+    <>
+      <h2 className="mono h2 spaced">MOTION</h2>
+      <label className="check">
+        <input type="checkbox" checked={on} onChange={(e) => { setOn(e.target.checked); void setAnimations(e.target.checked) }} />
+        Animations (rotating globe, pulsing dots, ticker)
+      </label>
+      <p className="tiny muted">Also switched off automatically if your computer asks for reduced motion.</p>
+    </>
+  )
+}
+
 function FocusSection() {
   const [options] = useLoad(api.focusOptions)
   const [picked, setPicked, err] = useLoad(api.focus)
@@ -458,6 +481,8 @@ export function SettingsPage({ onAiChange }: { onAiChange: () => void }) {
       {e2 && <div className="error">{e2}</div>}
 
       <FocusSection />
+
+      <AnimationSection />
 
       <VoiceSection />
 

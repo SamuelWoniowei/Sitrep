@@ -45,7 +45,7 @@ function files(dir: string): string[] {
 describe('UI renders untrusted text safely', () => {
   it('never turns feed or AI text into HTML', () => {
     const { container } = render(
-      <StoryCard story={story} index={0} open deeper aiReady onOpen={() => {}} onRead={() => {}} />,
+      <StoryCard story={story} index={0} open deeper aiReady hasNext onOpen={() => {}} onRead={() => {}} />,
     )
     expect(container.querySelector('script')).toBeNull()
     expect(container.querySelector('img')).toBeNull()

@@ -163,3 +163,61 @@ select { background: var(--chrome); border: 1px solid var(--field); border-radiu
 .tag-ai { background: rgba(124,196,255,.15); color: #7CC4FF; }
 .roles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; margin: 10px 0; }
 .role { border: 1px solid var(--line, #243042); border-radius: 6px; padding: 8px 10px; }
+
+/* ---------- v0.2: Live Ops, motion ---------- */
+.greet { font-size: 15px; margin-bottom: 8px; }
+.greet-hi { font-weight: 600; }
+.ticker { display: flex; align-items: center; gap: 10px; overflow: hidden; border: 1px solid var(--line, #243042); border-radius: 6px; padding: 6px 10px; margin-bottom: 10px; }
+.ticker-track { overflow: hidden; white-space: nowrap; flex: 1; }
+.ticker-run { display: inline-block; padding-left: 100%; animation: tick 60s linear infinite; font-size: 12px; opacity: .8; }
+@keyframes tick { to { transform: translateX(-100%); } }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.tile { border: 1px solid var(--line, #243042); border-radius: 8px; padding: 10px 12px; }
+.tile-n { font-size: 28px; font-weight: 600; }
+.globe-row { display: grid; grid-template-columns: minmax(280px, 560px) 1fr; gap: 16px; align-items: start; }
+@media (max-width: 900px) { .globe-row { grid-template-columns: 1fr; } }
+.globe-wrap { position: relative; }
+.globe { width: 100%; height: auto; touch-action: none; cursor: grab; display: block; }
+.globe:active { cursor: grabbing; }
+.globe-sea { fill: #0A1118; stroke: #243042; }
+.globe-grid { fill: none; stroke: #16202C; stroke-width: .5; }
+.globe-land { fill: #1B2736; stroke: #2C3B4F; stroke-width: .4; }
+.globe-hot { fill: #24405A; }
+.globe-arc { fill: none; stroke: #FFB066; stroke-width: 1.4; stroke-dasharray: 5 5; animation: dash 1.6s linear infinite; opacity: .9; }
+@keyframes dash { to { stroke-dashoffset: -20; } }
+.globe-label { fill: #8A97A8; font-size: 9px; text-anchor: middle; pointer-events: none; }
+.globe-node { cursor: pointer; }
+.globe-dot { fill: #38D39F; }
+.globe-pulse { fill: #38D39F; opacity: .25; transform-box: fill-box; transform-origin: center; animation: pulse 2.2s ease-out infinite; }
+.globe-node-on .globe-dot { fill: #FFB066; }
+@keyframes pulse { 0% { transform: scale(.6); opacity: .5; } 100% { transform: scale(1.6); opacity: 0; } }
+.globe-controls { position: absolute; right: 6px; bottom: 6px; display: flex; gap: 6px; }
+.stages { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.stage { display: flex; flex-direction: column; gap: 2px; padding: 6px 10px; border: 1px solid var(--line, #243042); border-radius: 6px; opacity: .45; }
+.stage-on { opacity: 1; border-color: #38D39F; }
+.stage-dot { width: 8px; height: 8px; border-radius: 50%; background: #3A4757; }
+.stage-on .stage-dot { background: #38D39F; }
+.cal { display: grid; grid-template-rows: repeat(7, 14px); grid-auto-flow: column; gap: 3px; width: max-content; max-width: 100%; overflow-x: auto; }
+.cal-cell { width: 14px; height: 14px; border-radius: 3px; background: #16202C; }
+.cal-on { background: #38D39F; }
+.conn { width: 100%; max-width: 560px; height: auto; }
+.conn-line { stroke: #4B6A8A; stroke-width: 1; }
+.conn-text { fill: #C3CCD7; font-size: 12px; }
+.conn-mono { font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+.board { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 8px; }
+.board-step { display: flex; gap: 10px; align-items: flex-start; opacity: 0; animation: rise .5s ease forwards; }
+.board-step:nth-child(2) { animation-delay: .35s; }
+.board-step:nth-child(3) { animation-delay: .7s; }
+.board-step:nth-child(4) { animation-delay: 1.05s; }
+.board-n { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; border-radius: 50%; border: 1px solid #38D39F; color: #38D39F; }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.story-open { animation: rise .3s ease; }
+.dot-busy { animation: pulse 1.2s ease-out infinite; }
+
+/* Motion off: user switch or OS "reduce motion". */
+.anim-off *, .anim-off *::before, .anim-off *::after { animation: none !important; transition: none !important; }
+.anim-off .board-step { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .board-step { opacity: 1; }
+}
