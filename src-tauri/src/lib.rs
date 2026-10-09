@@ -8,6 +8,7 @@ pub mod store;
 pub mod text;
 pub mod themes;
 pub mod updates;
+pub mod voice;
 
 use std::sync::Mutex;
 
@@ -67,6 +68,10 @@ pub fn run() {
             updates::app_version,
             updates::check_update,
             updates::install_update,
+            voice::voice_status,
+            voice::voice_install,
+            voice::voice_remove,
+            voice::speak_piper,
         ])
         .run(tauri::generate_context!())
         .expect("error while running the application");

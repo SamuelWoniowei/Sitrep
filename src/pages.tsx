@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api, errText, type AiStatus, type UpdateInfo, type BuiltItem, type Idea, type Project, type RadarRow, type Recap, type Term } from './api'
+import { api, errText, type AiStatus, type UpdateInfo, type BuiltItem, type Idea, type Project, type RadarRow, type Recap, type Term, type VoiceStatus } from './api'
 
 function useLoad<T>(fn: () => Promise<T>): [T | null, (v: T) => void, string | null, () => void] {
   const [data, setData] = useState<T | null>(null)
@@ -295,6 +295,44 @@ function FocusSection() {
   )
 }
 
+function VoiceSection() {
+  const [v, setV, err] = useLoad<VoiceStatus>(api.voiceStatus)
+  const [busy, setBusy] = useState(false)
+  const [e2, setE2] = useState<string | null>(null)
+  const run = (fn: () => Promise<VoiceStatus>) => {
+    setBusy(true)
+    setE2(null)
+    fn().then(setV).catch((e) => setE2(errText(e))).finally(() => setBusy(false))
+  }
+  return (
+    <>
+      <h2 className="mono h2 spaced">VOICE</h2>
+      {v && (
+        <>
+          <p className="small">
+            {v.installed
+              ? <>Natural voice: <span className="accent">{v.voice}</span>, running on this computer.</>
+              : <>Natural voice not installed. Listen mode will use a built-in Windows voice that runs on this device (never an "Online" one).</>}
+          </p>
+          {!v.installed ? (
+            <>
+              <button type="button" className="btn btn-primary" disabled={busy} onClick={() => run(api.voiceInstall)}>
+                {busy ? 'Downloading and checking…' : `Download natural voice (~${v.size_mb} MB, one time)`}
+              </button>
+              <p className="tiny muted">
+                Downloads Piper from its official GitHub release and the Alan voice from its official Hugging Face page, then checks both against fixed checksums. Anything that does not match is deleted. After that it works offline.
+              </p>
+            </>
+          ) : (
+            <button type="button" className="btn" disabled={busy} onClick={() => run(api.voiceRemove)}>Remove voice</button>
+          )}
+        </>
+      )}
+      {(err || e2) && <div className="error small">{err ?? e2}</div>}
+    </>
+  )
+}
+
 export function SettingsPage({ onAiChange }: { onAiChange: () => void }) {
   const [ai, setAi, err, reloadAi] = useLoad<AiStatus>(api.aiStatus)
   const [sources] = useLoad(api.sources)
@@ -351,13 +389,15 @@ export function SettingsPage({ onAiChange }: { onAiChange: () => void }) {
 
       <FocusSection />
 
+      <VoiceSection />
+
       <UpdatesSection />
 
       <h2 className="mono h2 spaced">PRIVACY</h2>
       <ul className="small muted plain-list">
         <li>No account, no analytics, no tracking. Your reading history, backlog and watchlist stay in a local database on this computer.</li>
         <li>The only internet traffic is downloading the public feeds below, CVE severity scores from NIST's NVD (only the CVE ID is sent) and, if enabled, the full text of today's 3 stories from those same news sites.</li>
-        <li>The AI runs only on this computer (127.0.0.1). Ollama "cloud" models are blocked so article text never leaves your PC.</li>
+        <li>The AI and the optional voice run only on this computer (the AI on 127.0.0.1). Ollama "cloud" models are blocked so article text never leaves your PC.</li>
         <li>Article links open in your normal browser only when you click "Read source".</li>
       </ul>
 

@@ -100,6 +100,7 @@ export interface Recap {
 export interface BuiltItem { week: string; title: string; theme: string; completed_at: number }
 export interface AiStatus { running: boolean; enabled: boolean; models: string[]; model: string; full_articles: boolean }
 export interface UpdateInfo { current: string; available: string | null; notes: string | null }
+export interface VoiceStatus { installed: boolean; voice: string; size_mb: number; sample_rate: number }
 export interface RefreshResult { new_stories: number; failed: string[]; skipped: boolean }
 
 export const api = {
@@ -131,6 +132,10 @@ export const api = {
   focus: () => invoke<string[]>('get_focus'),
   setFocus: (roles: string[]) => invoke<string[]>('set_focus', { roles }),
   focusOptions: () => invoke<string[]>('focus_options'),
+  voiceStatus: () => invoke<VoiceStatus>('voice_status'),
+  voiceInstall: () => invoke<VoiceStatus>('voice_install'),
+  voiceRemove: () => invoke<VoiceStatus>('voice_remove'),
+  speakPiper: (parts: string[]) => invoke<ArrayBuffer>('speak_piper', { parts }),
   appVersion: () => invoke<string>('app_version'),
   checkUpdate: () => invoke<UpdateInfo>('check_update'),
   installUpdate: () => invoke<void>('install_update'),
