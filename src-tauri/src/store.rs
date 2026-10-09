@@ -36,6 +36,27 @@ pub struct StoryRow {
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
+pub struct KevRow {
+    pub cve: String,
+    pub vendor: String,
+    pub product: String,
+    pub date_added: String,
+    pub ransomware: bool,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct GlossRow {
+    pub key: String,
+    pub term: String,
+    pub plain: String,
+    pub analogy: String,
+    pub status: String,
+    pub origin: String,
+    pub archived: bool,
+    pub added: i64,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct Idea {
     pub id: i64,
     pub title: String,
@@ -85,6 +106,10 @@ impl Store {
              CREATE TABLE IF NOT EXISTS watchlist(term TEXT PRIMARY KEY);
              CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
              CREATE TABLE IF NOT EXISTS cvss(cve TEXT PRIMARY KEY, score REAL NOT NULL, severity TEXT NOT NULL, fetched INTEGER NOT NULL);
+             CREATE TABLE IF NOT EXISTS gloss(
+               key TEXT PRIMARY KEY, term TEXT NOT NULL, plain TEXT NOT NULL, analogy TEXT NOT NULL DEFAULT '',
+               status TEXT NOT NULL DEFAULT 'new', origin TEXT NOT NULL, archived INTEGER NOT NULL DEFAULT 0,
+               added INTEGER NOT NULL);
              CREATE TABLE IF NOT EXISTS quiz(day TEXT PRIMARY KEY, term TEXT NOT NULL, options TEXT NOT NULL, answer INTEGER NOT NULL, chosen INTEGER);",
         )?;
         Ok(Store { conn })
@@ -247,6 +272,101 @@ impl Store {
                 |r| r.get(0),
             )
             .unwrap_or(0)
+    }
+
+    // ---------- KEV lookups ----------
+    /// KEV entries added on or after `date` (YYYY-MM-DD).
+    pub fn kev_recent(&self, date: &str) -> rusqlite::Result<Vec<KevRow>> {
+        let mut st = self.conn.prepare(
+            "SELECT cve,vendor,product,date_added,ransomware FROM kev WHERE date_added>=?1 LIMIT 3000",
+        )?;
+        let rows = st.query_map(params![date], |r| {
+            Ok(KevRow {
+                cve: r.get(0)?,
+                vendor: r.get(1)?,
+                product: r.get(2)?,
+                date_added: r.get(3)?,
+                ransomware: r.get::<_, i64>(4)? != 0,
+            })
+        })?;
+        rows.collect()
+    }
+
+    // ---------- glossary ----------
+    pub fn gloss_rows(&self) -> rusqlite::Result<Vec<GlossRow>> {
+        let mut st = self.conn.prepare(
+            "SELECT key,term,plain,analogy,status,origin,archived,added FROM gloss ORDER BY term COLLATE NOCASE",
+        )?;
+        let rows = st.query_map([], |r| {
+            Ok(GlossRow {
+                key: r.get(0)?,
+                term: r.get(1)?,
+                plain: r.get(2)?,
+                analogy: r.get(3)?,
+                status: r.get(4)?,
+                origin: r.get(5)?,
+                archived: r.get::<_, i64>(6)? != 0,
+                added: r.get(7)?,
+            })
+        })?;
+        rows.collect()
+    }
+    /// Number of AI-added terms still in play (not known, not archived).
+    pub fn gloss_ai_active(&self) -> i64 {
+        self.conn
+            .query_row(
+                "SELECT COUNT(*) FROM gloss WHERE origin='ai' AND archived=0 AND status!='known'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(0)
+    }
+    pub fn gloss_has(&self, key: &str) -> bool {
+        self.conn
+            .query_row("SELECT 1 FROM gloss WHERE key=?1", params![key], |_| Ok(()))
+            .optional()
+            .ok()
+            .flatten()
+            .is_some()
+    }
+    pub fn gloss_insert(
+        &self,
+        key: &str,
+        term: &str,
+        plain: &str,
+        analogy: &str,
+        origin: &str,
+        now: i64,
+    ) -> rusqlite::Result<()> {
+        self.conn.execute(
+            "INSERT OR IGNORE INTO gloss(key,term,plain,analogy,status,origin,archived,added) VALUES(?1,?2,?3,?4,'new',?5,0,?6)",
+            params![key, term, plain, analogy, origin, now],
+        )?;
+        Ok(())
+    }
+    /// Set a term's status; built-in terms get a row on first change.
+    pub fn gloss_set_status(
+        &self,
+        key: &str,
+        term: &str,
+        plain: &str,
+        analogy: &str,
+        status: &str,
+        now: i64,
+    ) -> rusqlite::Result<()> {
+        self.conn.execute(
+            "INSERT INTO gloss(key,term,plain,analogy,status,origin,archived,added) VALUES(?1,?2,?3,?4,?5,'builtin',0,?6)
+             ON CONFLICT(key) DO UPDATE SET status=excluded.status, archived=0",
+            params![key, term, plain, analogy, status, now],
+        )?;
+        Ok(())
+    }
+    pub fn gloss_expire(&self, now: i64) -> rusqlite::Result<()> {
+        self.conn.execute(
+            "UPDATE gloss SET archived=1 WHERE origin='ai' AND status='new' AND archived=0 AND added<?1",
+            params![now - 30 * DAY],
+        )?;
+        Ok(())
     }
 
     // ---------- CVSS (NVD) ----------

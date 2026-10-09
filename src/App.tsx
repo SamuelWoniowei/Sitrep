@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, errText, type Today as TodayData } from './api'
 import { Today } from './Today'
-import { BacklogPage, BuiltPage, GlossaryPage, ProjectPage, RadarPage, RecapPage, SettingsPage, WatchlistPage } from './pages'
+import { BacklogPage, BuiltPage, GlossaryPage, IntelPage, ProjectPage, RadarPage, RecapPage, SettingsPage, WatchlistPage } from './pages'
 import { briefScript, speakSystem, speakWithPiper, stopSpeaking } from './listen'
 
-export type Page = 'today' | 'project' | 'backlog' | 'built' | 'recap' | 'radar' | 'glossary' | 'watchlist' | 'settings'
+export type Page = 'today' | 'project' | 'backlog' | 'built' | 'recap' | 'radar' | 'glossary' | 'intel' | 'watchlist' | 'settings'
 
 const NAV: { id: Page; label: string; group?: 'top' | 'mid' | 'bottom' }[] = [
   { id: 'today', label: 'TODAY', group: 'top' },
@@ -13,6 +13,7 @@ const NAV: { id: Page; label: string; group?: 'top' | 'mid' | 'bottom' }[] = [
   { id: 'built', label: 'BUILT', group: 'top' },
   { id: 'recap', label: 'WEEKLY RECAP', group: 'mid' },
   { id: 'radar', label: 'SKILLS RADAR', group: 'mid' },
+  { id: 'intel', label: 'INTEL', group: 'mid' },
   { id: 'glossary', label: 'GLOSSARY', group: 'mid' },
   { id: 'watchlist', label: 'WATCHLIST', group: 'bottom' },
   { id: 'settings', label: 'SETTINGS', group: 'bottom' },
@@ -170,6 +171,7 @@ export default function App() {
           {page === 'recap' && <RecapPage />}
           {page === 'radar' && <RadarPage />}
           {page === 'glossary' && <GlossaryPage />}
+          {page === 'intel' && <IntelPage />}
           {page === 'watchlist' && <WatchlistPage onChange={() => void reload()} />}
           {page === 'settings' && <SettingsPage onAiChange={() => void checkAi()} />}
         </main>

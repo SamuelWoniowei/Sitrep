@@ -33,6 +33,7 @@ export function StoryCard({ story, index, open, deeper, aiReady, onOpen, onRead 
   const [answer, setAnswer] = useState<string | null>(null)
   const [asking, setAsking] = useState(false)
   const [linkErr, setLinkErr] = useState<string | null>(null)
+  const [pack, setPack] = useState<string | null>(null)
   const num = String(index + 1).padStart(2, '0')
 
   const ask = async () => {
@@ -90,6 +91,22 @@ export function StoryCard({ story, index, open, deeper, aiReady, onOpen, onRead 
           )}
           {story.action && <div className="why"><strong>What to do: </strong><span className="muted">{story.action}</span></div>}
           <div className="why"><strong>Why it matters to you: </strong><span className="muted">{story.why}</span></div>
+          {story.actors.length > 0 && (
+            <div className="chips">
+              <span className="muted small">Linked to:</span>
+              {story.actors.map((a) => <span key={a} className="tag tag-blue">{a}</span>)}
+            </div>
+          )}
+          {story.developing.length > 0 && (
+            <div className="deeper">
+              <div className="label">DEVELOPING · {story.developing.length} RELATED</div>
+              <ul className="plain-list small">
+                {story.developing.map((d) => (
+                  <li key={d.id}><span className="muted mono tiny">{new Date(d.published * 1000).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</span> {d.title} <span className="muted tiny">· {d.source} · {d.why}</span></li>
+                ))}
+              </ul>
+            </div>
+          )}
           {story.roles.length > 0 && (
             <div className="roles">
               {story.roles.map((r) => (
@@ -158,9 +175,17 @@ export function StoryCard({ story, index, open, deeper, aiReady, onOpen, onRead 
                 Read source
               </button>
             )}
+            <button
+              type="button"
+              className="btn"
+              onClick={() => api.labPack(story.id).then((r) => setPack(`Saved to ${r.folder} (${r.ips} IPs, ${r.domains} domains, ${r.hashes} hashes). Drafts for your lab only.`)).catch((e) => setPack(errText(e)))}
+            >
+              Lab pack
+            </button>
             {!story.read && <button type="button" className="btn btn-primary" onClick={onRead}>Got it</button>}
           </div>
           {linkErr && <div className="error small">{linkErr}</div>}
+          {pack && <div className="muted small">{pack}</div>}
         </>
       )}
       {!open && <div className="muted small">{story.read ? 'Read.' : 'Tap the headline to open.'}</div>}
