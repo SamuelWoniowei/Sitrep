@@ -1,6 +1,7 @@
 pub mod ai;
 pub mod commands;
 pub mod core;
+pub mod countries;
 pub mod feeds;
 pub mod glossary;
 pub mod intel;

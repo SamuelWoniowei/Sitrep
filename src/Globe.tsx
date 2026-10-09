@@ -6,7 +6,7 @@ import type { FeatureCollection, Geometry } from 'geojson'
 import countries110 from 'world-atlas/countries-110m.json'
 import { animationsOn, reducedMotion } from './prefs'
 
-export interface GlobeNode { iso: string; name: string; lat: number; lon: number; count: number }
+export interface GlobeNode { id: string; name: string; lat: number; lon: number; count: number }
 export interface GlobeArc { actor: string; from: string; to: string; count: number }
 
 type Fc = FeatureCollection<Geometry, { name?: string }>
@@ -80,7 +80,7 @@ export function Globe({ nodes, arcs, selected, onSelect }: Props) {
   const data = k > 2.2 && detail ? detail : BASE
   const center: [number, number] = [-rot[0], -rot[1]]
   const visible = (lon: number, lat: number) => geoDistance([lon, lat], center) < Math.PI / 2 - 0.05
-  const byIso = useMemo(() => new Map(nodes.map((n) => [n.iso, n])), [nodes])
+  const byId = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes])
 
   const labels = useMemo(() => {
     if (k <= 3.2) return []
@@ -119,11 +119,11 @@ export function Globe({ nodes, arcs, selected, onSelect }: Props) {
         <circle cx={SIZE / 2} cy={SIZE / 2} r={(SIZE / 2 - 14) * k} className="globe-sea" />
         <path d={path(geoGraticule10()) ?? ''} className="globe-grid" />
         {data.features.map((f, i) => (
-          <path key={f.properties?.name ?? i} d={path(f) ?? ''} className={`globe-land ${byIso.has(isoOf(f)) ? 'globe-hot' : ''}`} />
+          <path key={f.properties?.name ?? i} d={path(f) ?? ''} className={`globe-land ${byId.has(f.properties?.name ?? '') ? 'globe-hot' : ''}`} />
         ))}
         {arcs.map((a) => {
-          const from = nodes.find((n) => n.iso === a.from)
-          const to = nodes.find((n) => n.iso === a.to)
+          const from = nodes.find((n) => n.id === a.from)
+          const to = nodes.find((n) => n.id === a.to)
           if (!from || !to) return null
           const d = path({ type: 'LineString', coordinates: [[from.lon, from.lat], [to.lon, to.lat]] })
           return d ? <path key={`${a.actor}-${a.from}-${a.to}`} d={d} className="globe-arc" /> : null
@@ -137,7 +137,7 @@ export function Globe({ nodes, arcs, selected, onSelect }: Props) {
           if (!p) return null
           const r = 4 + Math.min(8, n.count * 1.5)
           return (
-            <g key={n.iso} className={`globe-node ${selected === n.iso ? 'globe-node-on' : ''}`} onClick={(e) => { e.stopPropagation(); onSelect(selected === n.iso ? null : n.iso) }}>
+            <g key={n.id} className={`globe-node ${selected === n.id ? 'globe-node-on' : ''}`} onClick={(e) => { e.stopPropagation(); onSelect(selected === n.id ? null : n.id) }}>
               <circle cx={p[0]} cy={p[1]} r={r} className="globe-pulse" />
               <circle cx={p[0]} cy={p[1]} r={Math.max(3, r / 2)} className="globe-dot" />
               <title>{n.name}: {n.count} {n.count === 1 ? 'story' : 'stories'}</title>
@@ -152,20 +152,4 @@ export function Globe({ nodes, arcs, selected, onSelect }: Props) {
       </div>
     </div>
   )
-}
-
-// World-atlas features carry only names. Map the few we mark as "hot" by name.
-const NAME_TO_ISO: Record<string, string> = {
-  'United States of America': 'US', 'United Kingdom': 'GB', Russia: 'RU', China: 'CN', 'North Korea': 'KP',
-  'South Korea': 'KR', Iran: 'IR', Israel: 'IL', Ukraine: 'UA', Poland: 'PL', Germany: 'DE', France: 'FR',
-  Italy: 'IT', Spain: 'ES', Netherlands: 'NL', Belgium: 'BE', Sweden: 'SE', Norway: 'NO', Finland: 'FI',
-  Denmark: 'DK', Ireland: 'IE', Switzerland: 'CH', Austria: 'AT', Czechia: 'CZ', Romania: 'RO', Greece: 'GR',
-  Portugal: 'PT', Hungary: 'HU', Belarus: 'BY', Turkey: 'TR', India: 'IN', Pakistan: 'PK', Japan: 'JP',
-  Taiwan: 'TW', Singapore: 'SG', Australia: 'AU', 'New Zealand': 'NZ', Canada: 'CA', Mexico: 'MX', Brazil: 'BR',
-  Argentina: 'AR', Colombia: 'CO', Nigeria: 'NG', 'South Africa': 'ZA', Egypt: 'EG', Kenya: 'KE',
-  'Saudi Arabia': 'SA', 'United Arab Emirates': 'AE', Qatar: 'QA', Iraq: 'IQ', Syria: 'SY', Lebanon: 'LB',
-  Vietnam: 'VN', Thailand: 'TH', Indonesia: 'ID', Philippines: 'PH', Malaysia: 'MY', Kazakhstan: 'KZ',
-}
-function isoOf(f: { properties?: { name?: string } | null }): string {
-  return NAME_TO_ISO[f.properties?.name ?? ''] ?? ''
 }
