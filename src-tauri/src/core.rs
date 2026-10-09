@@ -6,7 +6,7 @@ use chrono::{Datelike, Local, NaiveDate, TimeZone};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
-use crate::ai::{AiSummary, AiTerm};
+use crate::ai::{AiRole, AiSummary, AiTerm};
 use crate::glossary::{self, Term, TERMS};
 use crate::store::{Store, StoryRow};
 use crate::text::{first_sentences, truncate_chars};
@@ -145,12 +145,25 @@ pub struct StoryCard {
     pub tldr: String,
     pub why: String,
     pub deeper: String,
+    pub gist: String,
+    pub plain: String,
+    pub action: String,
+    pub roles: Vec<AiRole>,
+    pub cvss: Vec<CveScore>,
     pub terms: Vec<AiTerm>,
     pub cves: Vec<String>,
     pub watch_hits: Vec<String>,
     pub ai: bool,
     pub read: bool,
     pub has_link: bool,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct CveScore {
+    pub cve: String,
+    pub score: f64,
+    pub severity: String,
+    pub exploited: bool,
 }
 
 pub fn fallback_summary(store: &Store, s: &StoryRow, cat: Category) -> AiSummary {
@@ -173,6 +186,10 @@ pub fn fallback_summary(store: &Store, s: &StoryRow, cat: Category) -> AiSummary
         tldr: truncate_chars(&tldr, 400),
         why: themes::why_it_matters(cat, &themes_of(&text_of(s))),
         deeper,
+        gist: String::new(),
+        plain: String::new(),
+        action: String::new(),
+        roles: Vec::new(),
         terms: glossary::terms_in(&text_of(s), 3)
             .into_iter()
             .map(|t| AiTerm {
@@ -205,6 +222,23 @@ pub fn story_card(store: &Store, s: &StoryRow, watch: &[String], read: bool) -> 
         tldr: sum.tldr,
         why: sum.why,
         deeper: sum.deeper,
+        gist: sum.gist,
+        plain: sum.plain,
+        action: sum.action,
+        roles: sum.roles,
+        cvss: s
+            .cves
+            .iter()
+            .take(5)
+            .filter_map(|c| {
+                store.cvss(c).map(|(score, severity)| CveScore {
+                    cve: c.clone(),
+                    score,
+                    severity,
+                    exploited: store.in_kev(c),
+                })
+            })
+            .collect(),
         terms: sum.terms,
         cves: s.cves.clone(),
         watch_hits: watch_hits(s, watch),

@@ -17,6 +17,11 @@ export interface Story {
   tldr: string
   why: string
   deeper: string
+  gist: string
+  plain: string
+  action: string
+  roles: { role: string; note: string }[]
+  cvss: { cve: string; score: number; severity: string; exploited: boolean }[]
   terms: { term: string; plain: string }[]
   cves: string[]
   watch_hits: string[]
@@ -123,6 +128,9 @@ export const api = {
   watchlist: () => invoke<string[]>('get_watchlist'),
   addWatch: (term: string) => invoke<string[]>('add_watch', { term }),
   removeWatch: (term: string) => invoke<string[]>('remove_watch', { term }),
+  focus: () => invoke<string[]>('get_focus'),
+  setFocus: (roles: string[]) => invoke<string[]>('set_focus', { roles }),
+  focusOptions: () => invoke<string[]>('focus_options'),
   appVersion: () => invoke<string>('app_version'),
   checkUpdate: () => invoke<UpdateInfo>('check_update'),
   installUpdate: () => invoke<void>('install_update'),

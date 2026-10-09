@@ -157,3 +157,9 @@ select { background: var(--chrome); border: 1px solid var(--field); border-radiu
 .plain-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
 
 .footer { display: flex; flex-wrap: wrap; gap: 8px 20px; justify-content: space-between; padding: 10px 24px; border-top: 1px solid var(--line); background: var(--chrome); font-size: 12px; }
+
+.gist { line-height: 1.55; }
+.plain { background: var(--panel2, #0E141B); border-radius: 8px; padding: 10px 12px; font-size: 13px; margin: 8px 0; }
+.tag-ai { background: rgba(124,196,255,.15); color: #7CC4FF; }
+.roles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; margin: 10px 0; }
+.role { border: 1px solid var(--line, #243042); border-radius: 6px; padding: 8px 10px; }
