@@ -1,0 +1,129 @@
+// Typed wrappers around the Rust commands. The UI has no other way to reach
+// the network, the filesystem or the database.
+import { invoke } from '@tauri-apps/api/core'
+
+export type Category = 'exploited_now' | 'big_incident' | 'uk' | 'news'
+
+export interface Term { term: string; plain: string; analogy?: string }
+
+export interface Story {
+  id: string
+  category: Category
+  category_label: string
+  sources: string[]
+  published: number
+  original_title: string
+  headline: string
+  tldr: string
+  why: string
+  deeper: string
+  terms: { term: string; plain: string }[]
+  cves: string[]
+  watch_hits: string[]
+  ai: boolean
+  read: boolean
+  has_link: boolean
+}
+
+export interface Quiz {
+  day: string
+  question: string
+  options: string[]
+  chosen: number | null
+  answer: number | null
+  explanation: string | null
+}
+
+export interface ProjectPlan {
+  theme: string
+  title: string
+  why: string
+  tools: string[]
+  steps: string[]
+  done_when: string
+}
+
+export interface Project {
+  week: string
+  plan: ProjectPlan
+  done: boolean[]
+  completed: boolean
+  completed_at: number | null
+}
+
+export interface Idea {
+  id: number
+  title: string
+  detail: string
+  theme: string
+  created: number
+  starred: boolean
+  status: 'active' | 'archived'
+  reason: string | null
+  expires_in_days: number | null
+}
+
+export interface RadarRow { theme: string; key: string; mentions: number; built: boolean }
+
+export interface Today {
+  day: string
+  last_sync: number
+  stories: Story[]
+  read_count: number
+  exploited_recent: number
+  watch_hits: number
+  streak: number
+  term: Term
+  quiz: Quiz | null
+  project: Project | null
+  ideas: Idea[]
+  idea_count: number
+  idea_cap: number
+  recap_days_until: number
+  radar_top: RadarRow[]
+  watchlist: string[]
+}
+
+export interface Recap {
+  ready: boolean
+  days_until: number
+  story_count: number
+  themes: { theme: string; count: number; examples: string[] }[]
+  questions: { question: string; options: string[]; answer: number; explanation: string }[]
+}
+
+export interface BuiltItem { week: string; title: string; theme: string; completed_at: number }
+export interface AiStatus { running: boolean; enabled: boolean; models: string[]; model: string }
+export interface RefreshResult { new_stories: number; failed: string[]; skipped: boolean }
+
+export const api = {
+  refresh: (force = false) => invoke<RefreshResult>('refresh', { force }),
+  today: () => invoke<Today>('get_today'),
+  markRead: (id: string) => invoke<void>('mark_read', { id }),
+  openStory: (id: string) => invoke<void>('open_story', { id }),
+  aiStatus: () => invoke<AiStatus>('ai_status'),
+  setAi: (enabled: boolean, model: string) => invoke<void>('set_ai', { enabled, model }),
+  enhance: (id: string) => invoke<Story>('enhance_story', { id }),
+  ask: (id: string, question: string) => invoke<string>('ask_story', { id, question }),
+  ideas: (status: 'active' | 'archived') => invoke<Idea[]>('list_ideas', { status }),
+  starIdea: (id: number, starred: boolean) => invoke<void>('star_idea', { id, starred }),
+  dismissIdea: (id: number) => invoke<void>('dismiss_idea', { id }),
+  restoreIdea: (id: number) => invoke<boolean>('restore_idea', { id }),
+  deleteIdea: (id: number) => invoke<void>('delete_idea', { id }),
+  project: () => invoke<Project | null>('get_project'),
+  toggleStep: (step: number) => invoke<Project | null>('toggle_project_step', { step }),
+  completeProject: (completed: boolean) => invoke<Project | null>('complete_project', { completed }),
+  built: () => invoke<BuiltItem[]>('list_built'),
+  glossary: () => invoke<Term[]>('get_glossary'),
+  answerQuiz: (choice: number) => invoke<Quiz | null>('answer_quiz', { choice }),
+  recap: () => invoke<Recap>('get_recap'),
+  radar: () => invoke<RadarRow[]>('get_radar'),
+  watchlist: () => invoke<string[]>('get_watchlist'),
+  addWatch: (term: string) => invoke<string[]>('add_watch', { term }),
+  removeWatch: (term: string) => invoke<string[]>('remove_watch', { term }),
+  sources: () => invoke<{ name: string; url: string }[]>('list_sources'),
+}
+
+export function errText(e: unknown): string {
+  return typeof e === 'string' ? e : 'Something went wrong.'
+}
