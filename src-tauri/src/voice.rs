@@ -324,7 +324,11 @@ pub fn wav_pcm(wav: &[u8]) -> Result<&[u8], String> {
         let start = i + 8;
         if id == b"data" {
             // Streaming writers may leave the size as 0 or 0xFFFFFFFF.
-            let end = if size == 0 || size > wav.len() - start { wav.len() } else { start + size };
+            let end = if size == 0 || size > wav.len() - start {
+                wav.len()
+            } else {
+                start + size
+            };
             return Ok(&wav[start..end]);
         }
         i = start.saturating_add(size).saturating_add(size & 1);
@@ -392,7 +396,11 @@ pub async fn synth_file(
     let bytes = std::fs::read(out_file);
     let _ = std::fs::remove_file(out_file);
     if !status.success() {
-        let last = log.lines().rev().find(|l| !l.trim().is_empty()).unwrap_or("");
+        let last = log
+            .lines()
+            .rev()
+            .find(|l| !l.trim().is_empty())
+            .unwrap_or("");
         let last: String = last.chars().take(160).collect();
         return Err(format!("The voice engine stopped ({status}). {last}"));
     }
