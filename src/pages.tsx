@@ -26,7 +26,9 @@ export function ProjectPage() {
       <div className="mono small accent">PROJECT OF THE WEEK · {p.week}</div>
       <h1 className="h1">{p.plan.title}</h1>
       <p className="muted">{p.plan.why}</p>
-      <div className="small"><strong>Tools:</strong> {p.plan.tools.join(', ')}</div>
+      <div className="card"><div className="mono small muted">TOOLS</div><div className="small">{p.plan.tools.join(', ')}</div>
+      <div className="why"><strong>Done when: </strong><span className="muted">{p.plan.done_when}</span></div></div>
+      <div className="card span-all-2"><div className="mono small muted">STEPS</div>
       <ol className="checklist">
         {p.plan.steps.map((s, i) => (
           <li key={i}>
@@ -36,8 +38,7 @@ export function ProjectPage() {
             </label>
           </li>
         ))}
-      </ol>
-      <div className="why"><strong>Done when: </strong><span className="muted">{p.plan.done_when}</span></div>
+      </ol></div>
       <div className="actions">
         {p.completed ? (
           <button type="button" className="btn" onClick={() => run(() => api.completeProject(false))}>Mark as not built</button>
@@ -243,6 +244,7 @@ export function IntelPage() {
     <section className="panel page">
       <h1 className="h1">Intel</h1>
 
+      <div className="card">
       <h2 className="mono h2 spaced">AM I AFFECTED?</h2>
       <p className="small muted">Looks at the list of programs installed on this PC and compares their names with flaws attackers have recently started exploiting (CISA's list, last 90 days). It only reads names, keeps nothing, and sends nothing anywhere. It cannot check version numbers, so a match means "worth checking you are fully updated".</p>
       <button type="button" className="btn btn-primary" disabled={busy} onClick={check}>{busy ? 'Checking…' : 'Check this PC'}</button>
@@ -261,10 +263,13 @@ export function IntelPage() {
           ))}
         </>
       )}
+      </div>
 
+      <div className="card card-rest">
       <h2 className="mono h2 spaced">THREAT ACTORS IN THE NEWS (14 DAYS)</h2>
       {err && <div className="error">{err}</div>}
       {actors && actors.length === 0 && <p className="small muted">No known groups named in recent stories.</p>}
+      <div className="cols-2">
       {actors?.map((a) => (
         <div key={a.name} className="row">
           <div><strong>{a.name}</strong> <span className={`tag ${a.kind === 'Criminal' ? 'tag-amber' : 'tag-blue'}`}>{a.kind.toUpperCase()}</span> <span className="muted small">{a.origin} · {a.stories.length} {a.stories.length === 1 ? 'story' : 'stories'}</span></div>
@@ -274,6 +279,8 @@ export function IntelPage() {
           </ul>
         </div>
       ))}
+      </div>
+      </div>
     </section>
   )
 }
@@ -392,6 +399,16 @@ function VoiceSection() {
   const [v, setV, err] = useLoad<VoiceStatus>(api.voiceStatus)
   const [busy, setBusy] = useState(false)
   const [e2, setE2] = useState<string | null>(null)
+  const [testing, setTesting] = useState(false)
+  const [testMsg, setTestMsg] = useState('')
+  const test = () => {
+    unlockAudio()
+    setTesting(true)
+    setTestMsg('')
+    playParts(['This is Sitrep. If you can hear this, the voice is working.'], () => setTesting(false))
+      .then((r) => { setTestMsg(r.message); if (!r.ok) setTesting(false) })
+      .catch(() => { setTestMsg('Playback failed.'); setTesting(false) })
+  }
   const run = (fn: () => Promise<VoiceStatus>) => {
     setBusy(true)
     setE2(null)
@@ -417,8 +434,14 @@ function VoiceSection() {
               </p>
             </>
           ) : (
-            <button type="button" className="btn" disabled={busy} onClick={() => run(api.voiceRemove)}>Remove voice</button>
+            <>
+              <button type="button" className="btn btn-primary" disabled={busy || testing} onClick={test}>
+                {testing ? 'Speaking…' : '▶ Test voice'}
+              </button>
+              <button type="button" className="btn" disabled={busy} onClick={() => run(api.voiceRemove)}>Remove voice</button>
+            </>
           )}
+          {testMsg && <p className="small muted">{testMsg}</p>}
         </>
       )}
       {(err || e2) && <div className="error small">{err ?? e2}</div>}
@@ -436,6 +459,7 @@ export function SettingsPage({ onAiChange }: { onAiChange: () => void }) {
     <section className="panel page">
       <h1 className="h1">Settings</h1>
 
+      <div className="card">
       <h2 className="mono h2 spaced">LOCAL AI</h2>
       {err && <div className="error">{err}</div>}
       {ai && (
@@ -479,15 +503,17 @@ export function SettingsPage({ onAiChange }: { onAiChange: () => void }) {
         </>
       )}
       {e2 && <div className="error">{e2}</div>}
+      </div>
 
-      <FocusSection />
+      <div className="card"><FocusSection /></div>
 
-      <AnimationSection />
+      <div className="card"><VoiceSection /></div>
 
-      <VoiceSection />
+      <div className="card"><AnimationSection /></div>
 
-      <UpdatesSection />
+      <div className="card"><UpdatesSection /></div>
 
+      <div className="card">
       <h2 className="mono h2 spaced">PRIVACY</h2>
       <ul className="small muted plain-list">
         <li>No account, no analytics, no tracking. Your reading history, backlog and watchlist stay in a local database on this computer.</li>
@@ -495,11 +521,14 @@ export function SettingsPage({ onAiChange }: { onAiChange: () => void }) {
         <li>The AI and the optional voice run only on this computer (the AI on 127.0.0.1). Ollama "cloud" models are blocked so article text never leaves your PC.</li>
         <li>Article links open in your normal browser only when you click "Read source".</li>
       </ul>
+      </div>
 
+      <div className="card">
       <h2 className="mono h2 spaced">SOURCES</h2>
       <ul className="small plain-list">
         {sources?.map((s) => <li key={s.url}>{s.name} <span className="muted tiny mono">{s.url}</span></li>)}
       </ul>
+      </div>
     </section>
   )
 }
