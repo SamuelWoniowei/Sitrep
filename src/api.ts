@@ -86,6 +86,7 @@ export interface Today {
   exploited_recent: number
   watch_hits: number
   streak: number
+  new_today: number
   term: Term
   quiz: Quiz | null
   project: Project | null
@@ -95,6 +96,21 @@ export interface Today {
   recap_days_until: number
   radar_top: RadarRow[]
   watchlist: string[]
+}
+
+export interface LiveOps {
+  map: {
+    nodes: { iso: string; name: string; lat: number; lon: number; count: number; stories: [string, string][] }[]
+    arcs: { actor: string; from: string; to: string; count: number }[]
+    edges: { actor: string; cve: string }[]
+    stories_considered: number
+  }
+  cves: { cve: string; first_seen: number; exploited_on: string | null; ransomware: boolean; score: number | null; severity: string | null; fix_mentioned: boolean; stories: number; headline: string }[]
+  calendar: string[]
+  today: string
+  streak: number
+  exploited_14d: number
+  new_today: number
 }
 
 export interface Recap {
@@ -132,6 +148,9 @@ export const api = {
   built: () => invoke<BuiltItem[]>('list_built'),
   glossary: () => invoke<GlossEntry[]>('get_glossary'),
   setTermStatus: (key: string, status: string) => invoke<GlossEntry[]>('set_term_status', { key, status }),
+  getAnimations: () => invoke<boolean>('get_animations'),
+  setAnimations: (on: boolean) => invoke<void>('set_animations', { on }),
+  liveops: () => invoke<LiveOps>('get_liveops'),
   actors: () => invoke<ActorSeen[]>('get_actors'),
   exposure: () => invoke<ExposureResult>('check_exposure'),
   labPack: (id: string) => invoke<LabPackResult>('export_lab_pack', { id }),

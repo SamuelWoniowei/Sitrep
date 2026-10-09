@@ -85,3 +85,17 @@ export function stopSpeaking(): void {
   stopPiper()
   if (canListen()) window.speechSynthesis.cancel()
 }
+
+/** Read lines aloud with the best private voice available. Resolves false if none. */
+export async function playParts(parts: string[], onEnd: () => void): Promise<boolean> {
+  try {
+    const v = await api.voiceStatus()
+    if (v.installed) {
+      await speakWithPiper(parts, v.sample_rate, onEnd)
+      return true
+    }
+  } catch {
+    // fall through to an on-device system voice
+  }
+  return speakSystem(parts, onEnd)
+}

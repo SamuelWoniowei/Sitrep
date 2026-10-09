@@ -6,8 +6,8 @@ This is what was tested before the first public release (v0.1.0, October 2026) a
 
 | Check | Tool | Result |
 |---|---|---|
-| Backend unit and attack tests | `cargo test` | 61 passed |
-| UI tests (XSS rendering, code guardrails) | `vitest` | 7 passed |
+| Backend unit and attack tests | `cargo test` | 91 passed |
+| UI tests (XSS rendering, code guardrails) | `vitest` | 9 passed |
 | Rust lints, warnings as errors | `cargo clippy --all-targets -D warnings` | Clean |
 | Known-vulnerable Rust crates | `cargo audit` (RustSec, 1,295 advisories) | 0 vulnerabilities. 2 warnings, Linux-only (see below) |
 | Known-vulnerable npm packages | `npm audit` | 0 vulnerabilities |
@@ -97,3 +97,9 @@ semgrep scan --metrics=off --config /tmp/semgrep-rules/rust --config /tmp/semgre
 ```
 
 CI runs the tests, Clippy and both audits on every push and pull request.
+
+## Added in v0.2.0
+
+Automated tests now also cover: CVE ID validation and NVD response parsing (including hostile values), the new feed and article allowlists, Piper download hosts and redirect rules, checksum mismatch rejection, zip path-escape and zip-bomb refusal, tamper detection of installed voice files, stdin-only text hand-off and runaway-output cap for the voice engine, on-device-only voice selection, the career-focus setting (cannot inject prompt text), glossary merge/cap/expiry, actor name matching, installed-program matching, IOC extraction and rule generation (injection attempts), country matching, and the UI rendering hostile text in every new field.
+
+**Not tested here:** the Windows-only parts (running `piper.exe`, reading the installed-programs list) and the real feeds and downloads, because the build sandbox is Linux with restricted network access. They need a first run on a real Windows PC.

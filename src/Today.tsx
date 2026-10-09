@@ -43,8 +43,27 @@ export function Today({ data, aiReady, reload, go }: Props) {
   const p = data.project
   const stepsDone = p ? p.done.filter(Boolean).length : 0
 
+  const hour = new Date().getHours()
+  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
+  const unread = total - data.read_count
+
   return (
     <div className="today">
+      <div className="greet">
+        <span className="greet-hi">{greeting}.</span>{' '}
+        <span className="muted">
+          {total === 0 ? 'Press Refresh to load the news.' : unread === 0 ? "You're all caught up." : `${unread} ${unread === 1 ? 'story' : 'stories'} to read`}
+          {data.new_today > 0 && ` · +${data.new_today} new stories today`}
+        </span>
+      </div>
+      {data.stories.length > 0 && (
+        <div className="ticker" aria-hidden="true">
+          <span className="mono tiny accent">LATEST</span>
+          <div className="ticker-track">
+            <span className="ticker-run">{data.stories.map((s) => s.headline).join('   ·   ')}</span>
+          </div>
+        </div>
+      )}
       <div className="status-strip mono">
         <div><span className="muted">BRIEF </span>{data.read_count} / {total} READ</div>
         <div className="bar" aria-label={`${pct}% of today's brief read`}><div className="bar-fill" style={{ width: `${pct}%` }} /></div>
@@ -76,6 +95,7 @@ export function Today({ data, aiReady, reload, go }: Props) {
               open={openIdx === i}
               deeper={deeper}
               aiReady={aiReady}
+              hasNext={data.stories.some((x, j) => j > i && !x.read)}
               onOpen={() => setOpenIdx(i)}
               onRead={() => void read(i)}
             />

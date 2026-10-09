@@ -8,6 +8,23 @@ const TAG: Record<Story['category'], string> = {
   news: 'tag tag-grey',
 }
 
+// Splits the summary into up to four steps and lights them one after another.
+function Storyboard({ text }: { text: string }) {
+  const steps = (text.match(/[^.!?]+[.!?]+/g) ?? [text]).map((x) => x.trim()).filter(Boolean).slice(0, 4)
+  if (steps.length < 2) return null
+  const names = ['What happened', 'The weakness', 'The impact', 'The fix']
+  return (
+    <ol className="board" aria-label="Step by step">
+      {steps.map((st, i) => (
+        <li key={i} className="board-step">
+          <span className="board-n mono">{i + 1}</span>
+          <div><div className="mono tiny accent">{(steps.length === 4 ? names[i] : `Step ${i + 1}`).toUpperCase()}</div><div className="small">{st}</div></div>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
 function ago(ts: number): string {
   const h = Math.max(0, Math.round((Date.now() / 1000 - ts) / 3600))
   if (h < 1) return 'just now'
@@ -21,13 +38,14 @@ interface Props {
   open: boolean
   deeper: boolean
   aiReady: boolean
+  hasNext: boolean
   onOpen: () => void
   onRead: () => void
 }
 
 // All text is rendered as React text nodes (auto-escaped). This component,
 // like the rest of the UI, never renders HTML.
-export function StoryCard({ story, index, open, deeper, aiReady, onOpen, onRead }: Props) {
+export function StoryCard({ story, index, open, deeper, aiReady, hasNext, onOpen, onRead }: Props) {
   const [term, setTerm] = useState<string | null>(null)
   const [question, setQuestion] = useState('')
   const [answer, setAnswer] = useState<string | null>(null)
@@ -73,7 +91,7 @@ export function StoryCard({ story, index, open, deeper, aiReady, onOpen, onRead 
       {open && (
         <>
           <p><span className="mono accent">TL;DR </span>{story.tldr}</p>
-          {story.gist && <p className="gist">{story.gist}</p>}
+          {story.gist && (deeper ? <Storyboard text={story.gist} /> : <p className="gist">{story.gist}</p>)}
           {story.cvss.length > 0 && (
             <div className="chips">
               {story.cvss.map((c) => (
@@ -182,7 +200,7 @@ export function StoryCard({ story, index, open, deeper, aiReady, onOpen, onRead 
             >
               Lab pack
             </button>
-            {!story.read && <button type="button" className="btn btn-primary" onClick={onRead}>Got it</button>}
+            {!story.read && <button type="button" className="btn btn-primary" onClick={onRead}>{hasNext ? 'Got it, next →' : 'Got it'}</button>}
           </div>
           {linkErr && <div className="error small">{linkErr}</div>}
           {pack && <div className="muted small">{pack}</div>}

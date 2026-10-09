@@ -2,12 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, errText, type Today as TodayData } from './api'
 import { Today } from './Today'
 import { BacklogPage, BuiltPage, GlossaryPage, IntelPage, ProjectPage, RadarPage, RecapPage, SettingsPage, WatchlistPage } from './pages'
-import { briefScript, speakSystem, speakWithPiper, stopSpeaking } from './listen'
+import { LiveOpsPage } from './LiveOps'
+import { loadAnimations } from './prefs'
+import { briefScript, playParts, stopSpeaking } from './listen'
 
-export type Page = 'today' | 'project' | 'backlog' | 'built' | 'recap' | 'radar' | 'glossary' | 'intel' | 'watchlist' | 'settings'
+export type Page = 'today' | 'project' | 'backlog' | 'built' | 'recap' | 'radar' | 'glossary' | 'intel' | 'liveops' | 'watchlist' | 'settings'
 
 const NAV: { id: Page; label: string; group?: 'top' | 'mid' | 'bottom' }[] = [
   { id: 'today', label: 'TODAY', group: 'top' },
+  { id: 'liveops', label: 'LIVE OPS', group: 'top' },
   { id: 'project', label: 'PROJECT OF WEEK', group: 'top' },
   { id: 'backlog', label: 'BACKLOG', group: 'top' },
   { id: 'built', label: 'BUILT', group: 'top' },
@@ -97,6 +100,10 @@ export default function App() {
   }, [reload, checkAi, refresh])
 
   useEffect(() => {
+    void loadAnimations()
+  }, [])
+
+  useEffect(() => {
     if (aiReady && today) void enhance(today)
   }, [aiReady, today?.day, today?.stories.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -107,19 +114,9 @@ export default function App() {
       return
     }
     if (!today?.stories.length) return
-    const script = briefScript(today.stories)
-    const done = () => setSpeaking(false)
     setSpeaking(true)
-    try {
-      const v = await api.voiceStatus()
-      if (v.installed) {
-        await speakWithPiper(script, v.sample_rate, done)
-        return
-      }
-    } catch {
-      // fall back to an on-device system voice below
-    }
-    if (!speakSystem(script, done)) {
+    const ok = await playParts(briefScript(today.stories), () => setSpeaking(false))
+    if (!ok) {
       setSpeaking(false)
       setNote('No private voice found. Install the natural voice in Settings → Voice.')
     }
@@ -172,6 +169,7 @@ export default function App() {
           {page === 'radar' && <RadarPage />}
           {page === 'glossary' && <GlossaryPage />}
           {page === 'intel' && <IntelPage />}
+          {page === 'liveops' && <LiveOpsPage onOpenStory={() => setPage('today')} />}
           {page === 'watchlist' && <WatchlistPage onChange={() => void reload()} />}
           {page === 'settings' && <SettingsPage onAiChange={() => void checkAi()} />}
         </main>

@@ -177,6 +177,7 @@ pub struct Today {
     pub exploited_recent: i64,
     pub watch_hits: usize,
     pub streak: i64,
+    pub new_today: i64,
     pub term: Term,
     pub quiz: Option<QuizView>,
     pub project: Option<ProjectView>,
@@ -220,6 +221,14 @@ pub fn get_today(state: State<'_, AppState>) -> Res<Today> {
         exploited_recent: core::kev_recent_count(&store, t),
         watch_hits,
         streak: core::streak(&store, t),
+        new_today: store.count_fetched_since(
+            chrono::Local::now()
+                .date_naive()
+                .and_hms_opt(0, 0, 0)
+                .and_then(|d| d.and_local_timezone(chrono::Local).single())
+                .map(|d| d.timestamp())
+                .unwrap_or(t - 86_400),
+        ),
         term: *core::term_of_day(&store, &rows, t),
         quiz: core::quiz(&store, t),
         project: core::project(&store, t),
@@ -595,6 +604,39 @@ pub fn set_term_status(
     let s = lock(&state)?;
     intel::set_gloss_status(&s, &key, &status, now())?;
     Ok(intel::glossary_view(&s))
+}
+
+#[tauri::command]
+pub fn get_liveops(state: State<'_, AppState>) -> Res<crate::liveops::LiveOps> {
+    let t = now();
+    let s = lock(&state)?;
+    let midnight = chrono::Local::now()
+        .date_naive()
+        .and_hms_opt(0, 0, 0)
+        .and_then(|d| d.and_local_timezone(chrono::Local).single())
+        .map(|d| d.timestamp())
+        .unwrap_or(t - 86_400);
+    Ok(crate::liveops::LiveOps {
+        map: crate::liveops::build_map(&s, t - 14 * 86_400),
+        cves: crate::liveops::cve_tracker(&s, t),
+        calendar: crate::liveops::read_calendar(&s, t),
+        today: core::day_key(t),
+        streak: core::streak(&s, t),
+        exploited_14d: core::kev_recent_count(&s, t),
+        new_today: s.count_fetched_since(midnight),
+    })
+}
+
+#[tauri::command]
+pub fn get_animations(state: State<'_, AppState>) -> Res<bool> {
+    Ok(lock(&state)?.setting("animations").as_deref() != Some("off"))
+}
+
+#[tauri::command]
+pub fn set_animations(state: State<'_, AppState>, on: bool) -> Res<()> {
+    lock(&state)?
+        .set_setting("animations", if on { "on" } else { "off" })
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
