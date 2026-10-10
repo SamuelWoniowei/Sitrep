@@ -58,6 +58,7 @@ Sitrep is a single-user desktop app. It downloads public news feeds, stores them
 | T28 | **Weekly digest page used for script injection or tracking** | The exported HTML escapes all feed-derived text, carries a CSP meta tag that blocks scripts and remote loads, and includes only https links. A plain-text copy is also written. | `digest.rs` |
 | T29 | **Log hunt reading or leaking sensitive files** | The scan is local and read-only, started from a native file dialog opened by Rust only. Caps: 4 GB, 120 s, 64 KB per line, 200 hits. Matches are sanitised and shortened. Nothing from the file is sent over the network. The UI has no file-system or dialog permission. | `hunt.rs`, `commands.rs` |
 | T30 | **Dialog plugin widening the attack surface** | `tauri-plugin-dialog` is used from Rust only. No dialog capability is granted to the webview. | `lib.rs`, capabilities |
+| T31 | **AI-written fun facts being wrong or carrying injected content** | The facts prompt contains no article or web text, only the app's own instructions and earlier saved facts. Output must be JSON, is reduced to plain text, capped at 220 characters, rejected if it has links or `@`, de-duplicated, and capped at 60 saved. The UI labels these as AI-written and renders them as text. The daily fact is always from the built-in list. | `ai.rs::validate_facts`, `commands.rs::make_facts` |
 
 ## Residual risks (accepted, for now)
 

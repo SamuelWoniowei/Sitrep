@@ -6,7 +6,7 @@ This is what was tested before the first public release (v0.1.0, October 2026) a
 
 | Check | Tool | Result |
 |---|---|---|
-| Backend unit and attack tests | `cargo test` | 105 passed |
+| Backend unit and attack tests | `cargo test` | 106 passed |
 | UI tests (XSS rendering, code guardrails) | `vitest` | 9 passed |
 | Rust lints, warnings as errors | `cargo clippy --all-targets -D warnings` | Clean |
 | Known-vulnerable Rust crates | `cargo audit` (RustSec, 1,295 advisories) | 0 vulnerabilities. 2 warnings, Linux-only (see below) |

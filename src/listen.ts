@@ -10,12 +10,32 @@ export function canListen(): boolean {
   return typeof window !== 'undefined' && 'speechSynthesis' in window
 }
 
+/** Make text sound right when spoken: no CVE numbers read digit by digit, no links, no brackets. */
+export function spoken(t: string): string {
+  return t
+    .replace(/https?:\/\/\S+/gi, '')
+    .replace(/CVE-\d{4}-\d{4,}/gi, 'a tracked flaw')
+    .replace(/\s*\([^)]*\)/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+const ORDINALS = ['First', 'Next', 'Then', 'After that', 'Also']
+
+/** A plain-English spoken briefing: what happened, in simple words, and what to do. Not a reading of the cards. */
 export function briefScript(stories: Story[]): string[] {
-  const parts = [`Your sitrep. ${stories.length} things worth knowing today.`]
+  const parts = [`Here is your sitrep, in plain English. ${stories.length} ${stories.length === 1 ? 'thing' : 'things'} worth knowing today.`]
   stories.forEach((s, i) => {
-    parts.push(`Story ${i + 1}. ${s.headline}. ${s.tldr} Why it matters: ${s.why}`)
+    const lead = i === stories.length - 1 && stories.length > 1 ? 'Last' : ORDINALS[Math.min(i, ORDINALS.length - 1)]
+    const simple = spoken(s.plain || s.tldr || '')
+    const todo = spoken(s.action || '')
+    parts.push(
+      [`${lead}: ${spoken(s.headline)}.`, simple && `${simple.replace(/[.!?]*$/, '.')}`, todo && `What to do: ${todo.replace(/[.!?]*$/, '.')}`]
+        .filter(Boolean)
+        .join(' '),
+    )
   })
-  parts.push("That's it for today.")
+  parts.push("That's your sitrep. Nothing else needs you today.")
   return parts
 }
 

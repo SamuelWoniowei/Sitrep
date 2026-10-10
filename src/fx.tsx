@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { animationsOn, reducedMotion } from './prefs'
-import { factForDay } from './facts'
+import { api, errText } from './api'
+import { FACTS, factForDay } from './facts'
 
 /** Counts up to `to` once when shown. Shows the final number straight away if motion is off. */
 export function CountUp({ to, ms = 900 }: { to: number; ms?: number }) {
@@ -58,15 +59,36 @@ export function Radar() {
   return <span className="radar" aria-hidden="true" />
 }
 
-/** A security fun fact: one per day, with a button to see more. */
+/** A security fun fact: one vetted fact per day. "Another one" can also show AI-written ones, clearly labelled. */
 export function FunFact({ className = 'panel' }: { className?: string }) {
   const [shift, setShift] = useState(0)
-  const f = factForDay(new Date(), shift)
+  const [ai, setAi] = useState<{ tag: string; text: string }[]>([])
+  const [canAi, setCanAi] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+  useEffect(() => {
+    api.aiFacts().then(setAi).catch(() => setAi([]))
+    api.aiStatus().then((s) => setCanAi(s.running && s.enabled)).catch(() => setCanAi(false))
+  }, [])
+  const built = factForDay(new Date(), 0)
+  // Day 0 is always a vetted built-in fact. After that, "Another one" mixes in AI-written ones.
+  const pool = [...FACTS.map((f) => ({ ...f, ai: false })), ...ai.map((f) => ({ ...f, ai: true }))]
+  const f = shift === 0 ? { ...built, ai: false } : pool[(FACTS.indexOf(built) + shift * 7) % pool.length]
+  const more = () => {
+    setBusy(true)
+    setMsg('')
+    api.makeFacts().then((l) => { setAi(l); setMsg(`Added. ${l.length} AI-written facts saved.`) }).catch((e) => setMsg(errText(e))).finally(() => setBusy(false))
+  }
   return (
     <section className={className}>
-      <div className="panel-row mono small"><span className="muted">SECURITY FUN FACT</span><span className="tag tag-grey">{f.tag}</span></div>
+      <div className="panel-row mono small"><span className="muted">SECURITY FUN FACT</span><span className={`tag ${f.ai ? 'tag-amber' : 'tag-grey'}`}>{f.ai ? `AI · ${f.tag}` : f.tag}</span></div>
       <div key={shift} className="small fact-text">{f.text}</div>
-      <button type="button" className="linkish small" onClick={() => setShift((n) => n + 1)}>Another one →</button>
+      {f.ai && <div className="tiny muted">Written by your local AI. Small models can be wrong, so check before you quote it.</div>}
+      <div className="panel-row">
+        <button type="button" className="linkish small" onClick={() => setShift((n) => n + 1)}>Another one →</button>
+        {canAi && <button type="button" className="linkish small" disabled={busy} onClick={more}>{busy ? 'Writing…' : 'Make more with AI'}</button>}
+      </div>
+      {msg && <div className="tiny muted">{msg}</div>}
     </section>
   )
 }

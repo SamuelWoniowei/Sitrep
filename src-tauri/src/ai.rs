@@ -230,17 +230,27 @@ pub async fn list_models(client: &Client) -> Result<Vec<String>, String> {
 }
 
 pub async fn generate(client: &Client, model: &str, prompt: &str) -> Result<String, String> {
+    generate_with(client, model, SYSTEM, prompt, 0.2).await
+}
+
+pub async fn generate_with(
+    client: &Client,
+    model: &str,
+    system: &str,
+    prompt: &str,
+    temperature: f32,
+) -> Result<String, String> {
     #[derive(Deserialize)]
     struct Gen {
         response: String,
     }
     let mut body = serde_json::json!({
         "model": model,
-        "system": SYSTEM,
+        "system": system,
         "prompt": prompt,
         "format": "json",
         "stream": false,
-        "options": { "temperature": 0.2, "num_predict": 1200, "num_ctx": 8192 }
+        "options": { "temperature": temperature, "num_predict": 1200, "num_ctx": 8192 }
     });
     if is_thinking_model(model) {
         body["think"] = serde_json::Value::Bool(false);
@@ -257,6 +267,97 @@ pub async fn generate(client: &Client, model: &str, prompt: &str) -> Result<Stri
     let bytes = read_capped(resp, MAX_AI_BYTES).await?;
     let g: Gen = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
     Ok(g.response)
+}
+
+// ---------------- AI-written fun facts ----------------
+
+pub const FACT_TAGS: [&str; 6] = ["HISTORY", "MALWARE", "CRYPTO", "TOOLS", "BUGS", "HABITS"];
+pub const AI_FACT_CAP: usize = 60;
+
+const FACT_SYSTEM: &str = "You write short, true, well-documented fun facts about computer security \
+for a curious beginner. Only include a fact if you are certain it is true; if unsure, leave it out. \
+Plain English, no markdown, no HTML, no links.";
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct AiFact {
+    pub tag: String,
+    pub text: String,
+}
+
+pub fn facts_prompt(have: &[AiFact]) -> String {
+    let avoid: Vec<String> = have
+        .iter()
+        .rev()
+        .take(12)
+        .map(|f| format!("- {}", f.text))
+        .collect();
+    format!(
+        "Give 6 different fun facts about computer security: history, famous incidents, tools, \
+cryptography, or everyday habits. Each is one or two sentences under 200 characters. \
+Return JSON only: {{\"facts\":[{{\"tag\":\"HISTORY|MALWARE|CRYPTO|TOOLS|BUGS|HABITS\",\"text\":\"...\"}}]}}.\n\
+Do not repeat or rephrase these:\n{}",
+        if avoid.is_empty() { "(none yet)".to_string() } else { avoid.join("\n") }
+    )
+}
+
+fn fact_key(t: &str) -> String {
+    t.to_lowercase()
+        .chars()
+        .filter(|c| c.is_alphanumeric())
+        .take(40)
+        .collect()
+}
+
+/// Keep only plain, short, link-free facts, with a known tag, and drop repeats.
+pub fn validate_facts(raw: &str, have: &[AiFact]) -> Vec<AiFact> {
+    #[derive(Deserialize)]
+    struct Raw {
+        tag: Option<String>,
+        text: String,
+    }
+    #[derive(Deserialize)]
+    struct Wrap {
+        facts: Vec<Raw>,
+    }
+    let Ok(w) = serde_json::from_str::<Wrap>(strip_thinking(raw).trim()) else {
+        return vec![];
+    };
+    let mut seen: std::collections::HashSet<String> =
+        have.iter().map(|f| fact_key(&f.text)).collect();
+    let mut out = vec![];
+    for r in w.facts.into_iter().take(10) {
+        let text = to_plain(&r.text, 220);
+        let lower = text.to_lowercase();
+        if text.chars().count() < 30
+            || lower.contains("http")
+            || lower.contains("www.")
+            || lower.contains('@')
+            || !seen.insert(fact_key(&text))
+        {
+            continue;
+        }
+        let tag = r.tag.unwrap_or_default().to_uppercase();
+        let tag = if FACT_TAGS.contains(&tag.as_str()) {
+            tag
+        } else {
+            "FACT".to_string()
+        };
+        out.push(AiFact { tag, text });
+    }
+    out
+}
+
+pub async fn generate_facts(
+    client: &Client,
+    model: &str,
+    have: &[AiFact],
+) -> Result<Vec<AiFact>, String> {
+    let raw = generate_with(client, model, FACT_SYSTEM, &facts_prompt(have), 0.8).await?;
+    let new = validate_facts(&raw, have);
+    if new.is_empty() {
+        return Err("The AI gave no usable facts. Try again.".into());
+    }
+    Ok(new)
 }
 
 #[cfg(test)]
@@ -365,5 +466,23 @@ mod tests {
         );
         let s = validate_summary(&raw).unwrap();
         assert!(s.headline.chars().count() <= 160 && s.deeper.chars().count() <= 1200);
+    }
+
+    #[test]
+    fn ai_facts_are_validated() {
+        let raw = r#"{"facts":[
+            {"tag":"history","text":"The Morris worm of 1988 helped lead to the first CERT being created."},
+            {"tag":"weird","text":"Visit http://evil.example for more security trivia and fun things."},
+            {"tag":"HABITS","text":"too short"},
+            {"tag":"CRYPTO","text":"<b>Caesar</b> shifted letters by three in his private letters, reportedly."}
+        ]}"#;
+        let have = vec![];
+        let f = validate_facts(raw, &have);
+        assert_eq!(f.len(), 2);
+        assert_eq!(f[0].tag, "HISTORY");
+        assert!(!f[1].text.contains('<'));
+        let again = validate_facts(raw, &f);
+        assert!(again.is_empty(), "repeats are dropped");
+        assert!(validate_facts("not json", &have).is_empty());
     }
 }

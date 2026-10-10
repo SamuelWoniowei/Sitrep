@@ -3,11 +3,14 @@ import { briefScript, pcmToFloat, pickLocalVoice } from '../listen'
 import type { Story } from '../api'
 
 describe('listen mode', () => {
-  it('reads headline, tldr and why for each story', () => {
-    const s = { headline: 'H', tldr: 'T.', why: 'W' } as Story
-    const parts = briefScript([s, s])
+  it('speaks a plain-English summary, not the card text', () => {
+    const s = { headline: 'Flaw (CVE-2026-102255) exploited', tldr: 'Technical tldr.', why: 'WHYTEXT', plain: 'Attackers got in through an old door.', action: 'Update the box' } as Story
+    const t = { headline: 'Second', tldr: 'Plain fallback', why: 'x', plain: '', action: '' } as Story
+    const parts = briefScript([s, t])
     expect(parts).toHaveLength(4)
-    expect(parts[1]).toContain('Story 1. H. T. Why it matters: W')
+    expect(parts[1]).toBe('First: Flaw exploited. Attackers got in through an old door. What to do: Update the box.')
+    expect(parts[2]).toBe('Last: Second. Plain fallback.')
+    expect(parts.join(' ')).not.toMatch(/WHYTEXT|CVE-|Why it matters/)
   })
 
   it('never picks an online/cloud voice', () => {
