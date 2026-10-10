@@ -136,3 +136,10 @@ News comes from BleepingComputer, The Record, The Hacker News, the UK NCSC, the 
 - **Weekly digest**: export a shareable HTML + text summary of the week (Sunday Sitrep page). Escaped, script-free, https links only.
 - **Attack replay**: step through a developing story as an animated attack timeline.
 - **Log hunt**: pick a local log file and scan it, read-only, against indicators from the last 30 days of stories. Nothing leaves your PC.
+
+## v0.4.1 additions
+
+- Threat actors now sit beside the globe on Live ops; sparse pages are centred and width-capped instead of stretched.
+- **Security fun facts**: a built-in fact each day (35 short facts, nothing fetched).
+- Project of the week now lists **where to look** for each step (names of public datasets, docs and tools; no links are opened and no answers are given).
+- More motion: ticking UTC clock, heartbeat line, drifting grid, scanning edges, hover lift and glow on cards.

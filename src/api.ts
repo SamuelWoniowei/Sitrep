@@ -64,9 +64,16 @@ export interface ProjectPlan {
   done_when: string
 }
 
+export interface Resource {
+  name: string
+  at: string
+  note: string
+}
+
 export interface Project {
   week: string
   plan: ProjectPlan
+  resources: Resource[][]
   done: boolean[]
   completed: boolean
   completed_at: number | null

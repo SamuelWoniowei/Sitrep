@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { STAGES } from './StoryCard'
+import { FunFact } from './fx'
 import { api, errText, type ActorSeen, type AiStatus, type Cluster, type HuntResult, type WatchRow, type LabPackResult, type Project, type Systems, type VoiceStatus, type WeekStory } from './api'
 
 function useLoad<T>(fn: () => Promise<T>): [T | null, string | null] {
@@ -185,6 +186,20 @@ export function HuntPage() {
               <li>Plain-text logs only (not Windows .evtx). Stops at 4 GB or 2 minutes.</li>
             </ul>
           </div>
+          <div className="card">
+            <h2 className="mono h2 spaced">WHERE TO FIND LOGS</h2>
+            <ul className="small muted plain-list">
+              <li>Suricata: <code>/var/log/suricata/eve.json</code></li>
+              <li>Wazuh manager: <code>/var/ossec/logs/alerts/alerts.json</code></li>
+              <li>Firewall or proxy: export a day as .log or .csv</li>
+              <li>Windows events: export to CSV first (the app reads plain text only).</li>
+            </ul>
+          </div>
+          <div className="card">
+            <h2 className="mono h2 spaced">HOW TO READ A MATCH</h2>
+            <p className="small muted">A match means "this indicator was named in the news and also appears in your log". It is a lead, not proof. Check the time, the host and the story before you act.</p>
+          </div>
+          <FunFact className="card" />
         </div>
       </div>
       {res && (

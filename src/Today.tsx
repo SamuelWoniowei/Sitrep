@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, errText, type Idea, type Quiz, type Today as TodayData } from './api'
 import { StoryCard } from './StoryCard'
 import { IntelWall } from './ops'
+import { CountUp, FunFact, Pulse } from './fx'
 import type { Page } from './App'
 
 interface Props {
@@ -53,6 +54,7 @@ export function Today({ data, aiReady, reload, go }: Props) {
   return (
     <div className="today">
       <div className="greet">
+        <Pulse />
         <span className="greet-hi">{greeting}{name ? `, ${name}` : ''}.</span>{' '}
         <span className="muted">
           {total === 0 ? 'Press Refresh to load the news.' : unread === 0 ? "You're all caught up." : `${unread} ${unread === 1 ? 'story' : 'stories'} to read`}
@@ -70,8 +72,8 @@ export function Today({ data, aiReady, reload, go }: Props) {
       <div className="status-strip mono">
         <div><span className="muted">BRIEF </span>{data.read_count} / {total} READ</div>
         <div className="bar" aria-label={`${pct}% of today's brief read`}><div className="bar-fill" style={{ width: `${pct}%` }} /></div>
-        <div><span className="muted">KEV ADDED (7D) </span><span className="red">{data.exploited_recent}</span></div>
-        <div><span className="muted">WATCHLIST HITS </span><span className="amber">{data.watch_hits}</span></div>
+        <div><span className="muted">KEV ADDED (7D) </span><span className="red"><CountUp to={data.exploited_recent} /></span></div>
+        <div><span className="muted">WATCHLIST HITS </span><span className="amber"><CountUp to={data.watch_hits} /></span></div>
         <div><span className="muted">STREAK </span><span className="accent">{data.streak} {data.streak === 1 ? 'DAY' : 'DAYS'}</span></div>
       </div>
       {err && <div className="error">{err}</div>}
@@ -148,6 +150,8 @@ export function Today({ data, aiReady, reload, go }: Props) {
             <div className="muted small">{data.term.plain}</div>
             {data.term.analogy && <div className="small analogy">Think of it as: {data.term.analogy}</div>}
           </section>
+
+          <FunFact />
 
           <IntelWall go={go} />
 

@@ -392,6 +392,82 @@ pub fn project_for(theme: Theme, story_count: usize) -> ProjectPlan {
     }
 }
 
+/// A pointer to where a learner can find material for one project step. Names only: no links
+/// are opened by the app, and nothing here gives the answer away.
+#[derive(Serialize, Clone, Debug)]
+pub struct Res {
+    pub name: &'static str,
+    pub at: &'static str,
+    pub note: &'static str,
+}
+
+const fn r(name: &'static str, at: &'static str, note: &'static str) -> Res {
+    Res { name, at, note }
+}
+
+/// Where to look, one list per project step (same order as the steps).
+pub fn resources_for(theme_key: &str) -> Vec<Vec<Res>> {
+    let Some(theme) = Theme::from_key(theme_key) else {
+        return vec![];
+    };
+    match theme {
+        Theme::EdgeExploit => vec![
+            vec![r("Malware-Traffic-Analysis.net", "malware-traffic-analysis.net", "Public pcaps with write-ups. Search the product or CVE name."), r("Wireshark sample captures", "wiki.wireshark.org/SampleCaptures", "Free capture files to practise on.")],
+            vec![r("tcpreplay", "tcpreplay.appneta.com", "Docs for replaying a pcap onto a lab network.")],
+            vec![r("Suricata docs", "docs.suricata.io", "Rules, then Rule format."), r("Emerging Threats Open rules", "rules.emergingthreats.net", "Read how real rules are written.")],
+            vec![r("Wazuh docs", "documentation.wazuh.com", "Search for the Suricata integration.")],
+        ],
+        Theme::Ransomware => vec![
+            vec![r("Wazuh docs", "documentation.wazuh.com", "Capabilities, then File integrity monitoring.")],
+            vec![r("Atomic Red Team", "github.com/redcanaryco/atomic-red-team", "Safe tests by ATT&CK technique. Read first, run only in a lab VM.")],
+            vec![r("Wazuh docs", "documentation.wazuh.com", "Ruleset, then Custom rules.")],
+            vec![r("MITRE ATT&CK T1486", "attack.mitre.org", "Detection and mitigation notes for data encrypted for impact.")],
+        ],
+        Theme::Phishing => vec![
+            vec![r("dnstwist", "github.com/elceef/dnstwist", "Generates lookalike domains from one name. Read its README.")],
+            vec![r("dnstwist options", "github.com/elceef/dnstwist", "It can check which lookalikes are registered."), r("dnspython", "dnspython.org", "Look up DNS records from your own script.")],
+            vec![r("dnspython docs", "dnspython.org", "Query MX records for each domain.")],
+            vec![r("NCSC phishing guidance", "ncsc.gov.uk", "Plain wording you can borrow for your report.")],
+        ],
+        Theme::Identity => vec![
+            vec![r("OTRF Security-Datasets", "github.com/OTRF/Security-Datasets", "Recorded attack logs, some with authentication events."), r("Splunk attack_data", "github.com/splunk/attack_data", "Sample logs grouped by attack technique."), r("SecRepo", "secrepo.com", "A directory of public security datasets."), r("Make your own", "pypi.org/project/Faker", "Script fake sign-ins and plant a few bad ones. That is what Done when asks for.")],
+            vec![r("MITRE ATT&CK T1078", "attack.mitre.org", "Valid accounts: what abuse looks like."), r("SigmaHQ rules", "github.com/SigmaHQ/sigma", "Look in the cloud rules for sign-in ideas.")],
+            vec![r("MITRE ATT&CK T1621", "attack.mitre.org", "MFA request generation, often called MFA fatigue.")],
+            vec![r("Wazuh docs", "documentation.wazuh.com", "Ruleset, then Custom rules.")],
+        ],
+        Theme::SupplyChain => vec![
+            vec![r("OpenSSF Scorecard", "securityscorecards.dev", "Security scores for open-source projects.")],
+            vec![r("Syft", "github.com/anchore/syft", "Builds a software bill of materials."), r("npm ls / pip freeze", "docs.npmjs.com, pip.pypa.io", "Built-in ways to list dependencies.")],
+            vec![r("OSV", "osv.dev", "Open vulnerability database with a lookup API."), r("GitHub Advisory Database", "github.com/advisories", "Searchable advisories by package.")],
+            vec![r("FIRST CVSS", "first.org/cvss", "How severity scores are worked out."), r("CISA KEV", "cisa.gov/known-exploited-vulnerabilities-catalog", "Is any finding already being exploited?")],
+        ],
+        Theme::Malware => vec![
+            vec![r("Python docs", "docs.python.org", "A small web server and the requests library are enough.")],
+            vec![r("Suricata docs", "docs.suricata.io", "Output, then Eve JSON format.")],
+            vec![r("RITA", "github.com/activecm/rita", "A real beacon finder. Read how it scores regular timing."), r("MITRE ATT&CK T1071", "attack.mitre.org", "Application layer protocol: how C2 hides in normal traffic.")],
+            vec![r("Tranco list", "tranco-list.eu", "Top websites, useful for a list of known-normal destinations.")],
+        ],
+        Theme::DataBreach => vec![
+            vec![r("iperf3", "iperf.fr", "Make a controlled large transfer between two lab machines.")],
+            vec![r("Suricata docs", "docs.suricata.io", "Eve JSON flow records include bytes sent and received.")],
+            vec![r("Wazuh docs", "documentation.wazuh.com", "Ruleset, then Custom rules."), r("MITRE ATT&CK T1048", "attack.mitre.org", "Exfiltration over alternative protocols.")],
+            vec![r("CIC-IDS2017", "unb.ca/cic/datasets", "Labelled traffic to sanity-check your thresholds.")],
+        ],
+        Theme::Patching => vec![
+            vec![r("osquery", "osquery.io", "Its programs table lists installed software.")],
+            vec![r("CISA KEV", "cisa.gov/known-exploited-vulnerabilities-catalog", "Free JSON and CSV download.")],
+            vec![r("NVD developers", "nvd.nist.gov/developers", "Official product naming (CPE) and a free API.")],
+            vec![r("EPSS", "first.org/epss", "Scores how likely a flaw is to be exploited, for ranking.")],
+        ],
+        Theme::StateActor => vec![
+            vec![r("CISA advisories", "cisa.gov", "Joint advisories on state-backed groups."), r("NCSC advisories", "ncsc.gov.uk", "UK reports and joint statements.")],
+            vec![r("ATT&CK Navigator", "github.com/mitre-attack/attack-navigator", "Colour techniques onto a layer file."), r("ATT&CK Groups", "attack.mitre.org", "How other analysts mapped the same group.")],
+            vec![r("Atomic Red Team", "github.com/redcanaryco/atomic-red-team", "Read the tests for your chosen technique to learn what it looks like.")],
+            vec![r("SigmaHQ rules", "github.com/SigmaHQ/sigma", "Existing rules for the technique, to study.")],
+        ],
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -439,6 +515,12 @@ mod tests {
             assert!(!idea_for(*t).title.is_empty());
             let p = project_for(*t, 3);
             assert_eq!(p.steps.len(), 4);
+            assert_eq!(
+                resources_for(t.key()).len(),
+                4,
+                "one resource list per step"
+            );
+            assert!(resources_for(t.key()).iter().all(|l| !l.is_empty()));
             assert_eq!(Theme::from_key(t.key()), Some(*t));
         }
     }
