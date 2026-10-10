@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { playParts, unlockAudio } from './listen'
-import { CountUp } from './fx'
+import { CountUp, FunFact } from './fx'
 import { animationsOn, setAnimations } from './prefs'
 import { api, errText, type AiStatus, type UpdateInfo, type BuiltItem, type Idea, type Project, type RadarRow, type Recap, type GlossEntry, type ActorSeen, type ExposureResult, type VoiceStatus, type WatchRow, type DigestResult } from './api'
 
@@ -36,6 +36,13 @@ export function ProjectPage() {
               <input type="checkbox" checked={p.done[i]} onChange={() => run(() => api.toggleStep(i))} />
               <span className={p.done[i] ? 'step-done' : ''}>{s}</span>
             </label>
+            {p.resources?.[i]?.length > 0 && (
+              <ul className="where">
+                {p.resources[i].map((r) => (
+                  <li key={r.name + r.at}><span className="mono tiny accent">WHERE TO LOOK</span> <strong className="small">{r.name}</strong> <span className="mono tiny muted">{r.at}</span><span className="tiny muted"> · {r.note}</span></li>
+                ))}
+              </ul>
+            )}
           </li>
         ))}
       </ol></div>
@@ -45,6 +52,13 @@ export function ProjectPage() {
           <div className="small muted">{p.completed ? 'Built.' : `${p.done.length - p.done.filter(Boolean).length} steps left`}</div></div>
         <div className="card"><div className="mono small muted">TOOLS</div><div className="chips">{p.plan.tools.map((t) => <span key={t} className="tag tag-grey">{t}</span>)}</div></div>
         <div className="card"><div className="mono small muted">DONE WHEN</div><div className="small">{p.plan.done_when}</div></div>
+        <div className="card"><div className="mono small muted">HOW TO TACKLE IT</div>
+          <ul className="small muted plain-list">
+            <li>Do the steps in order and stop after each one to write a line about what you saw.</li>
+            <li>Keep it small. A rough version that works beats a perfect one that never ships.</li>
+            <li>Put the result on GitHub with a short README. It is your portfolio.</li>
+          </ul></div>
+        <FunFact className="card" />
       </div>
       </div>
       <div className="actions">
@@ -340,6 +354,15 @@ export function AffectedPage() {
           <h2 className="mono h2 spaced">HOW TO READ IT</h2>
           <p className="small muted">A match means "this product has a flaw under attack". It cannot see your version number, so open the program, update it, and you are covered. No match is not a guarantee: it only knows about the exploited-flaw list.</p>
         </div>
+        <div className="card">
+          <h2 className="mono h2 spaced">GOOD HABITS</h2>
+          <ul className="small muted plain-list">
+            <li>Turn on automatic updates for browsers, Office and your PDF reader.</li>
+            <li>Uninstall programs you no longer use. Fewer programs, fewer flaws.</li>
+            <li>Routers and VPNs need updates too, and they get forgotten.</li>
+          </ul>
+        </div>
+        <FunFact className="card" />
       </div>
       </div>
     </section>

@@ -352,6 +352,7 @@ pub fn quiz(store: &Store, now: i64) -> Option<QuizView> {
 pub struct ProjectView {
     pub week: String,
     pub plan: themes::ProjectPlan,
+    pub resources: Vec<Vec<themes::Res>>,
     pub done: Vec<bool>,
     pub completed: bool,
     pub completed_at: Option<i64>,
@@ -413,6 +414,7 @@ fn project_inner(store: &Store, now: i64, persist: bool) -> Option<ProjectView> 
         if !(persist || enough) {
             return Some(ProjectView {
                 week,
+                resources: themes::resources_for(&plan.theme),
                 plan,
                 done,
                 completed: false,
@@ -428,9 +430,11 @@ fn project_inner(store: &Store, now: i64, persist: bool) -> Option<ProjectView> 
             .ok()?;
     }
     let (plan, done, completed, completed_at) = store.project(&week).ok()??;
+    let plan: themes::ProjectPlan = serde_json::from_str(&plan).ok()?;
     Some(ProjectView {
         week,
-        plan: serde_json::from_str(&plan).ok()?,
+        resources: themes::resources_for(&plan.theme),
+        plan,
         done: serde_json::from_str(&done).ok()?,
         completed,
         completed_at,

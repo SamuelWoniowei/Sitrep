@@ -1,6 +1,6 @@
 import { CountUp, Gauge, Radar } from './fx'
 import { useEffect, useState } from 'react'
-import { api, errText, type LiveOps } from './api'
+import { api, errText, type ActorSeen, type LiveOps } from './api'
 import { Globe } from './Globe'
 
 function ago(ts: number): string {
@@ -79,6 +79,8 @@ export function LiveOpsPage({ onOpenStory }: { onOpenStory: () => void }) {
   const [d, setD] = useState<LiveOps | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [sel, setSel] = useState<string | null>(null)
+  const [actors, setActors] = useState<ActorSeen[]>([])
+  useEffect(() => { api.actors().then(setActors).catch(() => setActors([])) }, [])
   useEffect(() => { api.liveops().then(setD).catch((e) => setErr(errText(e))) }, [])
   if (err) return <div className="error">{err}</div>
   if (!d) return <div className="muted">Loading…</div>
@@ -127,6 +129,20 @@ export function LiveOpsPage({ onOpenStory }: { onOpenStory: () => void }) {
               {d.map.nodes.length === 0 && <p className="small muted">No countries named yet. Refresh to load stories.</p>}
             </>
           )}
+        </div>
+        <div className="globe-actors">
+          <h3 className="h3">Threat actors in the news</h3>
+          {actors.length === 0 && <p className="small muted">No known groups named in the last 14 days.</p>}
+          {actors.slice(0, 6).map((a) => (
+            <div key={a.name} className="actor-mini">
+              <div className="actor-mini-top">
+                <strong>{a.name}</strong>
+                <span className={`tag ${a.kind === 'Criminal' ? 'tag-amber' : 'tag-blue'}`}>{a.kind.toUpperCase()}</span>
+              </div>
+              <div className="tiny muted">{a.origin} · {a.stories.length} {a.stories.length === 1 ? 'story' : 'stories'}</div>
+              <div className="small">{a.blurb}</div>
+            </div>
+          ))}
         </div>
       </div>
 

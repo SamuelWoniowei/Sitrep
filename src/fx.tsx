@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { animationsOn, reducedMotion } from './prefs'
+import { factForDay } from './facts'
 
 /** Counts up to `to` once when shown. Shows the final number straight away if motion is off. */
 export function CountUp({ to, ms = 900 }: { to: number; ms?: number }) {
@@ -55,4 +56,39 @@ export function Wave() {
 /** A radar dial with a sweeping beam. */
 export function Radar() {
   return <span className="radar" aria-hidden="true" />
+}
+
+/** A security fun fact: one per day, with a button to see more. */
+export function FunFact({ className = 'panel' }: { className?: string }) {
+  const [shift, setShift] = useState(0)
+  const f = factForDay(new Date(), shift)
+  return (
+    <section className={className}>
+      <div className="panel-row mono small"><span className="muted">SECURITY FUN FACT</span><span className="tag tag-grey">{f.tag}</span></div>
+      <div key={shift} className="small fact-text">{f.text}</div>
+      <button type="button" className="linkish small" onClick={() => setShift((n) => n + 1)}>Another one →</button>
+    </section>
+  )
+}
+
+/** Ticking UTC clock for the top bar. */
+export function LiveClock() {
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000)
+    return () => clearInterval(t)
+  }, [])
+  return <span className="mono small clock" aria-label="Current time, UTC">UTC {now.toISOString().slice(11, 19)}</span>
+}
+
+/** A heartbeat line that scrolls along, to show the app is live. */
+export function Pulse() {
+  const beat = 'M0 12 H18 L22 12 L26 3 L31 21 L35 12 H60'
+  return (
+    <svg className="pulse" viewBox="0 0 240 24" preserveAspectRatio="none" aria-hidden="true">
+      <g className="pulse-run">
+        {[0, 60, 120, 180, 240, 300].map((x) => <path key={x} d={beat} transform={`translate(${x} 0)`} />)}
+      </g>
+    </svg>
+  )
 }

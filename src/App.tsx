@@ -5,7 +5,7 @@ import { ActorsPage, AffectedPage, BacklogPage, BuiltPage, GlossaryPage, Project
 import { LiveOpsPage } from './LiveOps'
 import { DevelopingPage, HuntPage, LabPackPage, SystemsPage } from './ops'
 import { loadAnimations } from './prefs'
-import { Wave } from './fx'
+import { LiveClock, Pulse, Wave } from './fx'
 import { briefScript, playParts, stopSpeaking, unlockAudio } from './listen'
 
 export type Page = 'today' | 'project' | 'backlog' | 'built' | 'recap' | 'radar' | 'glossary' | 'developing' | 'actors' | 'affected' | 'labpack' | 'hunt' | 'systems' | 'liveops' | 'watchlist' | 'settings'
@@ -142,6 +142,8 @@ export default function App() {
         </div>
         <div className="mono small muted">{date}</div>
         {sourceCount > 0 && <div className="mono small live"><span className="dot live-dot" />LIVE · {sourceCount} SOURCES</div>}
+        <LiveClock />
+        <Pulse />
         <div className="spacer" />
         <div className="mono small muted sync"><span className={`dot ${busy ? 'dot-busy' : ''}`} />{busy ? 'SYNCING…' : syncText(today?.last_sync ?? 0)}</div>
         <button type="button" className="btn" disabled={busy} onClick={() => void refresh(true)}>Refresh</button>
