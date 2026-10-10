@@ -170,12 +170,27 @@ export function HuntPage() {
     <section className="panel page">
       <h1 className="h1">Log hunt</h1>
       <div className="dash">
+        <div className="dash-main">
         <div className="card">
           <h2 className="mono h2 spaced">SCAN A LOG FILE</h2>
           <p className="small muted">Pick a log from your lab (Suricata <code>eve.json</code>, Wazuh <code>alerts.json</code>, a firewall or proxy log, a CSV). Sitrep looks for any IP, domain or file hash that was named in the last 30 days of security stories, and shows you where it appears.</p>
           <button type="button" className="btn btn-primary" disabled={busy} onClick={run}>{busy ? 'Scanning…' : 'Choose a log file…'}</button>
           {busy && <div className="scanbar" role="status" aria-label="Scanning the log"><span /></div>}
           {msg && <div className="error small">{msg}</div>}
+        </div>
+        <div className="card">
+          <h2 className="mono h2 spaced">WHERE TO FIND LOGS</h2>
+          <ul className="small muted plain-list">
+            <li>Suricata: <code>/var/log/suricata/eve.json</code></li>
+            <li>Wazuh manager: <code>/var/ossec/logs/alerts/alerts.json</code></li>
+            <li>Firewall or proxy: export a day as .log or .csv</li>
+            <li>Windows events: export to CSV first (the app reads plain text only).</li>
+          </ul>
+        </div>
+        <div className="card">
+          <h2 className="mono h2 spaced">HOW TO READ A MATCH</h2>
+          <p className="small muted">A match means "this indicator was named in the news and also appears in your log". It is a lead, not proof. Check the time, the host and the story before you act.</p>
+        </div>
         </div>
         <div className="dash-side">
           <div className="card">
@@ -185,19 +200,6 @@ export function HuntPage() {
               <li>Only short sample lines are shown here. Nothing is saved.</li>
               <li>Plain-text logs only (not Windows .evtx). Stops at 4 GB or 2 minutes.</li>
             </ul>
-          </div>
-          <div className="card">
-            <h2 className="mono h2 spaced">WHERE TO FIND LOGS</h2>
-            <ul className="small muted plain-list">
-              <li>Suricata: <code>/var/log/suricata/eve.json</code></li>
-              <li>Wazuh manager: <code>/var/ossec/logs/alerts/alerts.json</code></li>
-              <li>Firewall or proxy: export a day as .log or .csv</li>
-              <li>Windows events: export to CSV first (the app reads plain text only).</li>
-            </ul>
-          </div>
-          <div className="card">
-            <h2 className="mono h2 spaced">HOW TO READ A MATCH</h2>
-            <p className="small muted">A match means "this indicator was named in the news and also appears in your log". It is a lead, not proof. Check the time, the host and the story before you act.</p>
           </div>
           <FunFact className="card" />
         </div>

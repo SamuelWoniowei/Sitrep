@@ -28,6 +28,7 @@ export function ProjectPage() {
       <h1 className="h1">{p.plan.title}</h1>
       <p className="muted">{p.plan.why}</p>
       <div className="dash">
+      <div className="dash-main">
       <div className="card"><div className="mono small muted">STEPS · {p.done.filter(Boolean).length} OF {p.done.length}</div>
       <ol className="checklist">
         {p.plan.steps.map((s, i) => (
@@ -46,18 +47,19 @@ export function ProjectPage() {
           </li>
         ))}
       </ol></div>
-      <div className="dash-side">
-        <div className="card"><div className="mono small muted">PROGRESS</div>
-          <div className="bar"><div className="bar-fill" style={{ width: `${(p.done.filter(Boolean).length / p.done.length) * 100}%` }} /></div>
-          <div className="small muted">{p.completed ? 'Built.' : `${p.done.length - p.done.filter(Boolean).length} steps left`}</div></div>
-        <div className="card"><div className="mono small muted">TOOLS</div><div className="chips">{p.plan.tools.map((t) => <span key={t} className="tag tag-grey">{t}</span>)}</div></div>
-        <div className="card"><div className="mono small muted">DONE WHEN</div><div className="small">{p.plan.done_when}</div></div>
         <div className="card"><div className="mono small muted">HOW TO TACKLE IT</div>
           <ul className="small muted plain-list">
             <li>Do the steps in order and stop after each one to write a line about what you saw.</li>
             <li>Keep it small. A rough version that works beats a perfect one that never ships.</li>
             <li>Put the result on GitHub with a short README. It is your portfolio.</li>
           </ul></div>
+      </div>
+      <div className="dash-side">
+        <div className="card"><div className="mono small muted">PROGRESS</div>
+          <div className="bar"><div className="bar-fill" style={{ width: `${(p.done.filter(Boolean).length / p.done.length) * 100}%` }} /></div>
+          <div className="small muted">{p.completed ? 'Built.' : `${p.done.length - p.done.filter(Boolean).length} steps left`}</div></div>
+        <div className="card"><div className="mono small muted">TOOLS</div><div className="chips">{p.plan.tools.map((t) => <span key={t} className="tag tag-grey">{t}</span>)}</div></div>
+        <div className="card"><div className="mono small muted">DONE WHEN</div><div className="small">{p.plan.done_when}</div></div>
         <FunFact className="card" />
       </div>
       </div>
