@@ -31,7 +31,7 @@ function AttackFlow({ story }: { story: Story }) {
           const on = hits[i]
           const delay = on ? n++ * 0.6 : 0
           return (
-            <li key={st.label} className={`flow-step ${on ? 'flow-on' : ''}`} style={{ animationDelay: `${delay}s` }}>
+            <li key={st.label} className={`flow-step ${on ? 'flow-on' : ''}`} style={{ animationDelay: `${delay}s`, ['--d' as string]: delay }}>
               <span className="flow-dot" />
               <span className="small">{st.label}</span>
               <span className="tiny muted">{on ? 'in this story' : 'not mentioned'}</span>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { playParts, unlockAudio } from './listen'
+import { CountUp } from './fx'
 import { animationsOn, setAnimations } from './prefs'
 import { api, errText, type AiStatus, type UpdateInfo, type BuiltItem, type Idea, type Project, type RadarRow, type Recap, type GlossEntry, type ActorSeen, type ExposureResult, type VoiceStatus, type WatchRow } from './api'
 
@@ -246,6 +247,7 @@ export function AffectedPage() {
       <h2 className="mono h2 spaced">AM I AFFECTED?</h2>
       <p className="small muted">Looks at the list of programs installed on this PC and compares their names with flaws attackers have recently started exploiting (CISA's list, last 90 days). It only reads names, keeps nothing, and sends nothing anywhere. It cannot check version numbers, so a match means "worth checking you are fully updated".</p>
       <button type="button" className="btn btn-primary" disabled={busy} onClick={check}>{busy ? 'Checking…' : 'Check this PC'}</button>
+      {busy && <div className="scanbar" role="status" aria-label="Scanning installed programs"><span /></div>}
       {e2 && <div className="error small">{e2}</div>}
       {exp && !exp.supported && <p className="small muted">This check only works on Windows.</p>}
       {exp && exp.supported && (
@@ -327,7 +329,7 @@ export function WatchlistPage({ onChange }: { onChange: () => void }) {
             <strong className="actor-name">{r.term}</strong>
             <button type="button" className="chip-x" aria-label={`Remove ${r.term}`} onClick={() => api.removeWatch(r.term).then(() => { setRows(rows.filter((x) => x.term !== r.term)); onChange() })}>✕</button>
           </div>
-          <div className="watch-n"><span className={r.total ? 'accent' : 'muted'}>{r.total}</span> <span className="small muted">{r.total === 1 ? 'story' : 'stories'} in 30 days</span></div>
+          <div className="watch-n"><span className={r.total ? 'accent' : 'muted'}><CountUp to={r.total} /></span> <span className="small muted">{r.total === 1 ? 'story' : 'stories'} in 30 days</span></div>
           <Spark v={r.per_day} />
           <div className="mono tiny muted">LAST 14 DAYS</div>
           {r.latest.length === 0

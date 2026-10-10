@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { geoGraticule10, geoOrthographic, geoPath, geoCentroid, geoDistance } from 'd3-geo'
+import { geoGraticule10, geoInterpolate, geoOrthographic, geoPath, geoCentroid, geoDistance } from 'd3-geo'
 import { feature } from 'topojson-client'
 import type { Topology, GeometryCollection } from 'topojson-specification'
 import type { FeatureCollection, Geometry } from 'geojson'
@@ -72,6 +72,16 @@ export function Globe({ nodes, arcs, selected, onSelect }: Props) {
     return () => el.removeEventListener('wheel', onWheel)
   }, [])
 
+  // Packets travelling along each line, so the connections visibly move.
+  const [phase, setPhase] = useState(0)
+  useEffect(() => {
+    if (!animationsOn() || reducedMotion()) return
+    let raf = 0
+    const tick = (t: number) => { setPhase((t / 3200) % 1); raf = requestAnimationFrame(tick) }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [])
+
   const proj = useMemo(
     () => geoOrthographic().translate([SIZE / 2, SIZE / 2]).scale((SIZE / 2 - 14) * k).rotate([rot[0], rot[1], 0]).clipAngle(90),
     [rot, k],
@@ -127,6 +137,15 @@ export function Globe({ nodes, arcs, selected, onSelect }: Props) {
           if (!from || !to) return null
           const d = path({ type: 'LineString', coordinates: [[from.lon, from.lat], [to.lon, to.lat]] })
           return d ? <path key={`${a.actor}-${a.from}-${a.to}`} d={d} className="globe-arc" /> : null
+        })}
+        {phase > 0 && arcs.map((a, i) => {
+          const from = nodes.find((n) => n.id === a.from)
+          const to = nodes.find((n) => n.id === a.to)
+          if (!from || !to) return null
+          const pt = geoInterpolate([from.lon, from.lat], [to.lon, to.lat])((phase + i * 0.17) % 1)
+          if (!visible(pt[0], pt[1])) return null
+          const xy = proj(pt)
+          return xy ? <circle key={`pk-${a.actor}-${a.from}-${a.to}`} cx={xy[0]} cy={xy[1]} r={2.6} className="globe-packet" /> : null
         })}
         {labels.map((l) => {
           const p = proj(l.c)

@@ -5,6 +5,7 @@ import { ActorsPage, AffectedPage, BacklogPage, BuiltPage, GlossaryPage, Project
 import { LiveOpsPage } from './LiveOps'
 import { DevelopingPage, LabPackPage, SystemsPage } from './ops'
 import { loadAnimations } from './prefs'
+import { Wave } from './fx'
 import { briefScript, playParts, stopSpeaking, unlockAudio } from './listen'
 
 export type Page = 'today' | 'project' | 'backlog' | 'built' | 'recap' | 'radar' | 'glossary' | 'developing' | 'actors' | 'affected' | 'labpack' | 'systems' | 'liveops' | 'watchlist' | 'settings'
@@ -144,7 +145,7 @@ export default function App() {
         <div className="mono small muted sync"><span className={`dot ${busy ? 'dot-busy' : ''}`} />{busy ? 'SYNCING…' : syncText(today?.last_sync ?? 0)}</div>
         <button type="button" className="btn" disabled={busy} onClick={() => void refresh(true)}>Refresh</button>
         <button type="button" className="btn btn-primary" onClick={() => void listen()} disabled={!today?.stories.length}>
-          {speaking ? '■ Stop' : `▶ Listen to brief · ${minutes} min`}
+          {speaking ? <><Wave /> Stop</> : `▶ Listen to brief · ${minutes} min`}
         </button>
       </header>
 
