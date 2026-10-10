@@ -378,8 +378,8 @@ section.page > .card.card-open { grid-column: 1 / -1; }
 @media (max-width: 1100px) { .dev-split { grid-template-columns: minmax(0, 1fr); } }
 
 /* v0.4.1: tidy widths, actors beside the globe, fun facts, stronger ambient motion */
-section.page:not(.page-wide) { max-width: 1240px; margin-inline: auto; width: 100%; }
-section.page.page-wide { max-width: 1840px; margin-inline: auto; width: 100%; }
+section.page:not(.page-wide) { max-width: 1320px; margin-inline: 0; width: 100%; }
+section.page.page-wide { max-width: 1840px; margin-inline: 0; width: 100%; }
 .page-wide .globe-row { grid-template-columns: minmax(340px, 620px) minmax(190px, 240px) minmax(280px, 1fr); gap: 20px; align-items: start; }
 @media (max-width: 1300px) { .page-wide .globe-row { grid-template-columns: minmax(300px, 520px) minmax(180px, 1fr); } .globe-actors { grid-column: 1 / -1; } }
 @media (max-width: 900px) { .page-wide .globe-row { grid-template-columns: 1fr; } }
@@ -434,3 +434,5 @@ body::before { content: ''; position: fixed; inset: 0; z-index: 0; pointer-event
 .spark-bar:hover { transform: scaleY(1.12); filter: brightness(1.3); }
 .rail-item:nth-child(2) { animation-delay: .04s; } .rail-item:nth-child(3) { animation-delay: .08s; } .rail-item:nth-child(4) { animation-delay: .12s; } .rail-item:nth-child(5) { animation-delay: .16s; } .rail-item:nth-child(6) { animation-delay: .2s; }
 .where { list-style: none; margin: 4px 0 8px 28px; padding: 0 0 0 10px; border-left: 2px solid var(--line-2); display: grid; gap: 3px; }
+.dash-main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.dash-main > .card { background: var(--chrome); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }

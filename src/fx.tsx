@@ -67,7 +67,7 @@ export function FunFact({ className = 'panel' }: { className?: string }) {
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
   useEffect(() => {
-    api.aiFacts().then(setAi).catch(() => setAi([]))
+    api.aiFacts().then((l) => setAi(Array.isArray(l) ? l : [])).catch(() => setAi([]))
     api.aiStatus().then((s) => setCanAi(s.running && s.enabled)).catch(() => setCanAi(false))
   }, [])
   const built = factForDay(new Date(), 0)
