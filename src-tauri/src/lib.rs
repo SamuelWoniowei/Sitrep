@@ -70,6 +70,8 @@ pub fn run() {
             commands::get_watch_board,
             commands::get_week_stories,
             commands::get_name,
+            commands::get_ai_facts,
+            commands::make_facts,
             commands::set_name,
             commands::get_systems,
             commands::export_digest,

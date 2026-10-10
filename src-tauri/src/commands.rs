@@ -993,3 +993,41 @@ pub async fn hunt_logs(
     .map_err(|e| e.to_string())??;
     Ok(Some(res))
 }
+
+const FACTS_KEY: &str = "ai_facts";
+
+fn load_ai_facts(s: &Store) -> Vec<ai::AiFact> {
+    s.setting(FACTS_KEY)
+        .and_then(|j| serde_json::from_str(&j).ok())
+        .unwrap_or_default()
+}
+
+#[tauri::command]
+pub fn get_ai_facts(state: State<'_, AppState>) -> Res<Vec<ai::AiFact>> {
+    let s = lock(&state)?;
+    Ok(load_ai_facts(&s))
+}
+
+/// Ask the local AI for more fun facts. They are labelled as AI-written in the UI.
+#[tauri::command]
+pub async fn make_facts(state: State<'_, AppState>) -> Res<Vec<ai::AiFact>> {
+    let have = {
+        let s = lock(&state)?;
+        load_ai_facts(&s)
+    };
+    let model = ai_model(&state).await?;
+    let new = ai::generate_facts(&state.ai_client, &model, &have).await?;
+    let mut all = have;
+    all.extend(new);
+    if all.len() > ai::AI_FACT_CAP {
+        let drop = all.len() - ai::AI_FACT_CAP;
+        all.drain(..drop);
+    }
+    let s = lock(&state)?;
+    s.set_setting(
+        FACTS_KEY,
+        &serde_json::to_string(&all).map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(all)
+}
