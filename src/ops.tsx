@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api, errText, type AiStatus, type Cluster, type LabPackResult, type Project, type Systems, type VoiceStatus, type WeekStory } from './api'
+import { api, errText, type ActorSeen, type AiStatus, type Cluster, type WatchRow, type LabPackResult, type Project, type Systems, type VoiceStatus, type WeekStory } from './api'
 
 function useLoad<T>(fn: () => Promise<T>): [T | null, string | null] {
   const [data, setData] = useState<T | null>(null)
@@ -7,6 +7,52 @@ function useLoad<T>(fn: () => Promise<T>): [T | null, string | null] {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fn().then(setData).catch((e) => setErr(errText(e))) }, [])
   return [data, err]
+}
+
+export function IntelWall({ go }: { go: (p: 'developing' | 'actors' | 'affected' | 'watchlist') => void }) {
+  const [dev] = useLoad<Cluster[]>(api.developing)
+  const [actors] = useLoad<ActorSeen[]>(api.actors)
+  const [watch] = useLoad<WatchRow[]>(api.watchBoard)
+  return (
+    <>
+      <section className="panel">
+        <div className="panel-row mono small"><span className="muted">DEVELOPING</span><button type="button" className="linkish" onClick={() => go('developing')}>all →</button></div>
+        {dev?.length === 0 && <div className="muted small">Nothing is developing right now.</div>}
+        {dev?.slice(0, 3).map((c) => (
+          <div key={c.first + c.title} className="wall-row">
+            <div className="small">{c.title}</div>
+            <div className="mono tiny muted">DAY {c.days} · {c.items.length} REPORTS{c.new_count ? <span className="accent"> · {c.new_count} NEW</span> : ''}</div>
+          </div>
+        ))}
+      </section>
+      <section className="panel">
+        <div className="panel-row mono small"><span className="muted">THREAT ACTORS · 14 DAYS</span><button type="button" className="linkish" onClick={() => go('actors')}>all →</button></div>
+        {actors?.length === 0 && <div className="muted small">No known groups named lately.</div>}
+        {actors?.slice(0, 4).map((a) => (
+          <div key={a.name} className="wall-row wall-flex">
+            <span className="small"><strong>{a.name}</strong> <span className="muted">· {a.origin.split(',')[0]}</span></span>
+            <span className={`tag ${a.kind === 'Criminal' ? 'tag-amber' : 'tag-blue'}`}>{a.stories.length}</span>
+          </div>
+        ))}
+      </section>
+      <section className="panel">
+        <div className="panel-row mono small"><span className="muted">WATCHLIST PULSE</span><button type="button" className="linkish" onClick={() => go('watchlist')}>board →</button></div>
+        {watch?.length === 0 && <div className="muted small">Add vendors you care about on the Watchlist.</div>}
+        {watch?.slice(0, 4).map((w) => (
+          <div key={w.term} className="wall-row wall-flex">
+            <span className="small">{w.term}</span>
+            <span className="wall-spark">{w.per_day.map((n, i) => <span key={i} className="spark-bar" style={{ height: `${Math.max(10, n * 40)}%`, opacity: n ? 1 : 0.25 }} />)}</span>
+            <span className="mono small">{w.total}</span>
+          </div>
+        ))}
+      </section>
+      <section className="panel panel-accent">
+        <div className="mono small muted">AM I AFFECTED?</div>
+        <div className="small">Check this PC against flaws attackers are using right now.</div>
+        <button type="button" className="btn btn-primary" onClick={() => go('affected')}>Check this PC →</button>
+      </section>
+    </>
+  )
 }
 
 const fmt = (ts: number) => new Date(ts * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
