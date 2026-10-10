@@ -38,6 +38,9 @@ export interface ClusterItem { id: string; title: string; source: string; publis
 export interface Cluster { title: string; first: number; last: number; days: number; cves: string[]; new_count: number; items: ClusterItem[] }
 export interface WatchRow { term: string; total: number; per_day: number[]; latest: [string, string, number][] }
 export interface WeekStory { id: string; headline: string; published: number; cves: string[]; iocs: number }
+export interface DigestResult { folder: string; week: string; stories: number; text: string }
+export interface HuntHit { ioc: string; kind: string; count: number; first_line: number; sample: string; story_id: string; story_title: string }
+export interface HuntResult { file: string; lines: number; bytes: number; checked: number; truncated: boolean; hits: HuntHit[] }
 export interface Systems { stories: number; kev: number; reads: number; oldest: number; last_sync: number; sources: number }
 export interface Exposure { program: string; vendor: string; product: string; cves: string[]; latest_added: string; ransomware: boolean }
 export interface ExposureResult { supported: boolean; programs: number; window_days: number; matches: Exposure[] }
@@ -163,6 +166,8 @@ export const api = {
   weekStories: () => invoke<WeekStory[]>('get_week_stories'),
   getName: () => invoke<string>('get_name'),
   setName: (name: string) => invoke<string>('set_name', { name }),
+  exportDigest: () => invoke<DigestResult>('export_digest'),
+  huntLogs: () => invoke<HuntResult | null>('hunt_logs'),
   systems: () => invoke<Systems>('get_systems'),
   exposure: () => invoke<ExposureResult>('check_exposure'),
   labPack: (id: string) => invoke<LabPackResult>('export_lab_pack', { id }),

@@ -2,8 +2,10 @@ pub mod ai;
 pub mod commands;
 pub mod core;
 pub mod countries;
+pub mod digest;
 pub mod feeds;
 pub mod glossary;
+pub mod hunt;
 pub mod intel;
 pub mod liveops;
 pub mod net;
@@ -23,6 +25,7 @@ use commands::AppState;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             // The database lives in the per-user app data folder, readable only
@@ -69,6 +72,8 @@ pub fn run() {
             commands::get_name,
             commands::set_name,
             commands::get_systems,
+            commands::export_digest,
+            commands::hunt_logs,
             commands::get_liveops,
             commands::get_animations,
             commands::set_animations,

@@ -9,7 +9,7 @@ const TAG: Record<Story['category'], string> = {
 }
 
 // Splits the summary into up to four steps and lights them one after another.
-const STAGES: { label: string; words: RegExp }[] = [
+export const STAGES: { label: string; words: RegExp }[] = [
   { label: 'Get in', words: /phish|exploit|vulnerab|zero-day|credential|stolen|brute|vpn|rdp|supply.chain|malicious|compromis|breach/i },
   { label: 'Run code', words: /execut|malware|payload|script|powershell|loader|backdoor|trojan|install|remote code/i },
   { label: 'Stay hidden', words: /persist|implant|escalat|privilege|evad|disable|hidden|stealth/i },

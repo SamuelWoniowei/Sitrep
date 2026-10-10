@@ -3,12 +3,12 @@ import { api, errText, type Today as TodayData } from './api'
 import { Today } from './Today'
 import { ActorsPage, AffectedPage, BacklogPage, BuiltPage, GlossaryPage, ProjectPage, RadarPage, RecapPage, SettingsPage, WatchlistPage } from './pages'
 import { LiveOpsPage } from './LiveOps'
-import { DevelopingPage, LabPackPage, SystemsPage } from './ops'
+import { DevelopingPage, HuntPage, LabPackPage, SystemsPage } from './ops'
 import { loadAnimations } from './prefs'
 import { Wave } from './fx'
 import { briefScript, playParts, stopSpeaking, unlockAudio } from './listen'
 
-export type Page = 'today' | 'project' | 'backlog' | 'built' | 'recap' | 'radar' | 'glossary' | 'developing' | 'actors' | 'affected' | 'labpack' | 'systems' | 'liveops' | 'watchlist' | 'settings'
+export type Page = 'today' | 'project' | 'backlog' | 'built' | 'recap' | 'radar' | 'glossary' | 'developing' | 'actors' | 'affected' | 'labpack' | 'hunt' | 'systems' | 'liveops' | 'watchlist' | 'settings'
 
 const NAV: { id: Page; label: string; group?: 'top' | 'mid' | 'learn' | 'bottom' }[] = [
   { id: 'today', label: 'TODAY', group: 'top' },
@@ -20,6 +20,7 @@ const NAV: { id: Page; label: string; group?: 'top' | 'mid' | 'learn' | 'bottom'
   { id: 'actors', label: 'THREAT ACTORS', group: 'mid' },
   { id: 'affected', label: 'AM I AFFECTED?', group: 'mid' },
   { id: 'labpack', label: 'LAB PACK', group: 'mid' },
+  { id: 'hunt', label: 'LOG HUNT', group: 'mid' },
   { id: 'recap', label: 'SUNDAY SITREP', group: 'learn' },
   { id: 'radar', label: 'SKILLS RADAR', group: 'learn' },
   { id: 'glossary', label: 'GLOSSARY', group: 'learn' },
@@ -180,6 +181,7 @@ export default function App() {
           {page === 'actors' && <ActorsPage />}
           {page === 'affected' && <AffectedPage />}
           {page === 'labpack' && <LabPackPage />}
+          {page === 'hunt' && <HuntPage />}
           {page === 'systems' && <SystemsPage />}
           {page === 'liveops' && <LiveOpsPage onOpenStory={() => setPage('today')} />}
           {page === 'watchlist' && <WatchlistPage onChange={() => void reload()} />}
