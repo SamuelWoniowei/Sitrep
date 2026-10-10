@@ -27,9 +27,8 @@ export function ProjectPage() {
       <div className="mono small accent">PROJECT OF THE WEEK · {p.week}</div>
       <h1 className="h1">{p.plan.title}</h1>
       <p className="muted">{p.plan.why}</p>
-      <div className="card"><div className="mono small muted">TOOLS</div><div className="small">{p.plan.tools.join(', ')}</div>
-      <div className="why"><strong>Done when: </strong><span className="muted">{p.plan.done_when}</span></div></div>
-      <div className="card span-all-2"><div className="mono small muted">STEPS</div>
+      <div className="dash">
+      <div className="card"><div className="mono small muted">STEPS · {p.done.filter(Boolean).length} OF {p.done.length}</div>
       <ol className="checklist">
         {p.plan.steps.map((s, i) => (
           <li key={i}>
@@ -40,6 +39,14 @@ export function ProjectPage() {
           </li>
         ))}
       </ol></div>
+      <div className="dash-side">
+        <div className="card"><div className="mono small muted">PROGRESS</div>
+          <div className="bar"><div className="bar-fill" style={{ width: `${(p.done.filter(Boolean).length / p.done.length) * 100}%` }} /></div>
+          <div className="small muted">{p.completed ? 'Built.' : `${p.done.length - p.done.filter(Boolean).length} steps left`}</div></div>
+        <div className="card"><div className="mono small muted">TOOLS</div><div className="chips">{p.plan.tools.map((t) => <span key={t} className="tag tag-grey">{t}</span>)}</div></div>
+        <div className="card"><div className="mono small muted">DONE WHEN</div><div className="small">{p.plan.done_when}</div></div>
+      </div>
+      </div>
       <div className="actions">
         {p.completed ? (
           <button type="button" className="btn" onClick={() => run(() => api.completeProject(false))}>Mark as not built</button>
@@ -141,12 +148,18 @@ export function RecapPage() {
         ▶ Listen to the recap
       </button>
       <p className="muted small">{r.ready ? "It's Sunday: here's your week." : `Preview. The full recap lands in ${r.days_until} days.`} {r.story_count} stories in the last 7 days.</p>
-      {r.themes.map((t) => (
-        <div key={t.theme} className="row">
-          <div><strong>{t.theme}</strong> <span className="muted small">· {t.count} stories</span></div>
-          {t.examples.map((e) => <div key={e} className="small muted">• {e}</div>)}
-        </div>
-      ))}
+      <div className="dash">
+      <div className="card">
+        <h2 className="mono h2 spaced">THEMES OF THE WEEK</h2>
+        {r.themes.map((t) => (
+          <div key={t.theme} className="theme">
+            <div className="panel-row"><strong>{t.theme}</strong><span className="mono small muted">{t.count} stories</span></div>
+            <div className="bar"><div className="bar-fill" style={{ width: `${(t.count / Math.max(1, ...r.themes.map((x) => x.count))) * 100}%` }} /></div>
+            {t.examples.map((e) => <div key={e} className="small muted">• {e}</div>)}
+          </div>
+        ))}
+      </div>
+      <div className="dash-side">
       {r.questions.length > 0 && <h2 className="mono h2 spaced">3 QUESTIONS</h2>}
       {r.questions.map((q, qi) => (
         <div key={qi} className="row">
@@ -161,6 +174,8 @@ export function RecapPage() {
           {picked[qi] !== undefined && <div className="small muted">{q.explanation}</div>}
         </div>
       ))}
+      </div>
+      </div>
     </section>
   )
 }
@@ -174,7 +189,9 @@ export function RadarPage() {
       <h1 className="h1">Skills radar</h1>
       <p className="muted small">What the news kept talking about in the last 30 days, against what you've built.</p>
       {err && <div className="error">{err}</div>}
-      {gaps.length > 0 && <div className="why"><strong>Learn next: </strong><span className="muted">{gaps.map((g) => g.theme).join(', ')}</span></div>}
+      <div className="dash">
+      <div className="card">
+      <h2 className="mono h2 spaced">LAST 30 DAYS</h2>
       {rows?.map((r) => (
         <div key={r.key} className="radar-row">
           <div className="radar-label small">{r.theme}</div>
@@ -183,6 +200,17 @@ export function RadarPage() {
         </div>
       ))}
       <p className="muted tiny">✓ = you've built a project on this theme.</p>
+      </div>
+      <div className="dash-side">
+        <div className="card panel-accent"><div className="mono small muted">LEARN NEXT</div>
+          {gaps.length === 0 && <div className="small muted">Nothing standing out yet.</div>}
+          {gaps.map((g) => <div key={g.key} className="small"><strong>{g.theme}</strong> <span className="muted">· {g.mentions} mentions, nothing built</span></div>)}
+        </div>
+        <div className="card"><div className="mono small muted">COVERAGE</div>
+          <div className="watch-n"><span className="accent"><CountUp to={(rows ?? []).filter((r) => r.built).length} /></span><span className="small muted"> of {(rows ?? []).length} themes built</span></div>
+        </div>
+      </div>
+      </div>
     </section>
   )
 }
@@ -243,8 +271,9 @@ export function AffectedPage() {
   return (
     <section className="panel page">
       <h1 className="h1">Am I affected?</h1>
+      <div className="dash">
       <div className="card">
-      <h2 className="mono h2 spaced">AM I AFFECTED?</h2>
+      <h2 className="mono h2 spaced">SCAN</h2>
       <p className="small muted">Looks at the list of programs installed on this PC and compares their names with flaws attackers have recently started exploiting (CISA's list, last 90 days). It only reads names, keeps nothing, and sends nothing anywhere. It cannot check version numbers, so a match means "worth checking you are fully updated".</p>
       <button type="button" className="btn btn-primary" disabled={busy} onClick={check}>{busy ? 'Checking…' : 'Check this PC'}</button>
       {busy && <div className="scanbar" role="status" aria-label="Scanning installed programs"><span /></div>}
@@ -265,6 +294,21 @@ export function AffectedPage() {
       )}
       </div>
 
+      <div className="dash-side">
+        <div className="card">
+          <h2 className="mono h2 spaced">HOW IT WORKS</h2>
+          <ol className="small plain-list">
+            <li>Reads the names of programs installed on this PC. Nothing else.</li>
+            <li>Compares them with CISA's list of flaws attackers are exploiting (last 90 days).</li>
+            <li>Shows matches. Nothing is saved or sent anywhere.</li>
+          </ol>
+        </div>
+        <div className="card">
+          <h2 className="mono h2 spaced">HOW TO READ IT</h2>
+          <p className="small muted">A match means "this product has a flaw under attack". It cannot see your version number, so open the program, update it, and you are covered. No match is not a guarantee: it only knows about the exploited-flaw list.</p>
+        </div>
+      </div>
+      </div>
     </section>
   )
 }

@@ -339,3 +339,19 @@ section.page > :nth-child(n+8) { animation-delay: .35s; }
 
 /* Live Ops lays out its own sections, so it is a plain column rather than a card grid. */
 section.page.page-wide { display: flex; flex-direction: column; align-items: stretch; }
+
+/* v0.3.2: dashboard compositions: a main column and a side column, so wide screens are used. */
+.dash { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.dash-side { display: flex; flex-direction: column; gap: 14px; }
+@media (max-width: 1100px) { .dash { grid-template-columns: minmax(0, 1fr); } }
+.dash > .card, .dash-side > .card { background: var(--chrome); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+.dash > .card .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+.dash .radar-row { grid-template-columns: minmax(110px, 200px) 1fr 50px; padding: 8px 0; }
+.dash .bar { height: 8px; }
+.theme { display: flex; flex-direction: column; gap: 4px; padding: 10px 0; border-top: 1px solid var(--line-2); }
+.theme:first-of-type { border-top: none; }
+.wall-row { padding: 8px 0; border-top: 1px solid var(--line-2); display: flex; flex-direction: column; gap: 2px; }
+.wall-row:first-of-type { border-top: none; }
+.wall-flex { flex-direction: row; justify-content: space-between; align-items: center; gap: 10px; }
+.wall-spark { display: flex; align-items: flex-end; gap: 2px; height: 20px; width: 70px; }
+.wall-spark .spark-bar { flex: 1; }

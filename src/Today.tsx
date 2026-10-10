@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, errText, type Idea, type Quiz, type Today as TodayData } from './api'
 import { StoryCard } from './StoryCard'
+import { IntelWall } from './ops'
 import type { Page } from './App'
 
 interface Props {
@@ -147,6 +148,8 @@ export function Today({ data, aiReady, reload, go }: Props) {
             <div className="muted small">{data.term.plain}</div>
             {data.term.analogy && <div className="small analogy">Think of it as: {data.term.analogy}</div>}
           </section>
+
+          <IntelWall go={go} />
 
           {quiz && (
             <section className="panel">
