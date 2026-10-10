@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { api, errText, type ActorSeen, type AiStatus, type Cluster, type WatchRow, type LabPackResult, type Project, type Systems, type VoiceStatus, type WeekStory } from './api'
+import { STAGES } from './StoryCard'
+import { api, errText, type ActorSeen, type AiStatus, type Cluster, type HuntResult, type WatchRow, type LabPackResult, type Project, type Systems, type VoiceStatus, type WeekStory } from './api'
 
 function useLoad<T>(fn: () => Promise<T>): [T | null, string | null] {
   const [data, setData] = useState<T | null>(null)
@@ -57,8 +58,62 @@ export function IntelWall({ go }: { go: (p: 'developing' | 'actors' | 'affected'
 
 const fmt = (ts: number) => new Date(ts * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
 
+/** Plays a developing story back day by day: reports appear, attack stages light up. */
+function Replay({ c }: { c: Cluster }) {
+  const [day, setDay] = useState(1)
+  const [playing, setPlaying] = useState(false)
+  useEffect(() => {
+    if (!playing) return
+    const t = window.setInterval(() => {
+      setDay((d) => {
+        if (d >= c.days) { setPlaying(false); return d }
+        return d + 1
+      })
+    }, 1100)
+    return () => window.clearInterval(t)
+  }, [playing, c.days])
+  const shown = c.items.filter((i) => i.day <= day)
+  const text = shown.map((i) => i.title).join(' ')
+  const lit = STAGES.map((s) => s.words.test(text))
+  const pct = (d: number) => (c.days <= 1 ? 50 : ((d - 1) / (c.days - 1)) * 100)
+  return (
+    <div className="replay">
+      <div className="replay-bar">
+        <button type="button" className="btn btn-primary" onClick={() => { if (day >= c.days) setDay(1); setPlaying(!playing) }}>
+          {playing ? '❚❚ Pause' : day >= c.days ? '↺ Replay' : '▶ Play'}
+        </button>
+        <span className="mono small">DAY {day} / {c.days}</span>
+        <input type="range" min={1} max={Math.max(1, c.days)} value={day} aria-label="Day" onChange={(e) => { setPlaying(false); setDay(Number(e.target.value)) }} />
+      </div>
+      <div className="replay-track" aria-hidden="true">
+        <span className="replay-line" />
+        {c.items.map((i) => <span key={i.id} className={`replay-dot ${i.day <= day ? 'on' : ''}`} style={{ left: `${pct(i.day)}%` }} />)}
+        <span className="replay-head" style={{ left: `${pct(day)}%` }} />
+      </div>
+      <ol className="flow">
+        {STAGES.map((s, i) => (
+          <li key={s.label} className={`flow-step ${lit[i] ? 'flow-on' : ''}`}>
+            <span className="flow-dot" /><span className="small">{s.label}</span>
+            <span className="tiny muted">{lit[i] ? 'seen so far' : 'not yet'}</span>
+          </li>
+        ))}
+      </ol>
+      <ul className="replay-list">
+        {shown.map((i) => (
+          <li key={i.id} className={i.day === day ? 'replay-now' : ''}>
+            <span className="mono tiny muted">DAY {i.day} · {i.source}</span>
+            <div className="small">{i.title}</div>
+          </li>
+        ))}
+      </ul>
+      <p className="tiny muted">A replay of how the news unfolded. Stages are estimated from the report titles, so treat it as a guide.</p>
+    </div>
+  )
+}
+
 export function DevelopingPage() {
   const [clusters, err] = useLoad<Cluster[]>(api.developing)
+  const [open, setOpen] = useState<string | null>(null)
   return (
     <section className="panel page">
       <h1 className="h1">Developing stories</h1>
@@ -66,12 +121,14 @@ export function DevelopingPage() {
       {err && <div className="error">{err}</div>}
       {clusters?.length === 0 && <p className="muted">Nothing is developing right now. Stories appear here once two or more reports cover the same thing.</p>}
       {clusters?.map((c) => (
-        <div key={c.first + c.title} className="card">
+        <div key={c.first + c.title} className={`card ${open === c.first + c.title ? 'card-open' : ''}`}>
           <div className="panel-head">
             <strong className="actor-name">{c.title}</strong>
             {c.new_count > 0 && <span className="tag tag-green">{c.new_count} NEW SINCE YOU READ</span>}
           </div>
           <div className="mono tiny muted">DAY 1 → DAY {c.days} · {c.items.length} REPORTS{c.cves.length ? ` · ${c.cves.join(' · ')}` : ''}</div>
+          <div className={open === c.first + c.title ? 'dev-split' : ''}>
+          <div>
           <ol className="timeline">
             {c.items.map((i) => (
               <li key={i.id} className={`tl-item ${i.new ? 'tl-new' : ''}`}>
@@ -81,8 +138,75 @@ export function DevelopingPage() {
               </li>
             ))}
           </ol>
+          <div className="actions">
+            <button type="button" className="btn" onClick={() => setOpen(open === c.first + c.title ? null : c.first + c.title)}>
+              {open === c.first + c.title ? 'Close replay' : '▶ Attack replay'}
+            </button>
+          </div>
+          </div>
+          {open === c.first + c.title && <Replay c={c} />}
+          </div>
         </div>
       ))}
+    </section>
+  )
+}
+
+export function HuntPage() {
+  const [res, setRes] = useState<HuntResult | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+  const run = () => {
+    setBusy(true)
+    setMsg('')
+    api.huntLogs()
+      .then((r) => { if (r) setRes(r); else setMsg('No file chosen.') })
+      .catch((e) => setMsg(errText(e)))
+      .finally(() => setBusy(false))
+  }
+  const mb = (b: number) => (b / 1048576).toFixed(1)
+  return (
+    <section className="panel page">
+      <h1 className="h1">Log hunt</h1>
+      <div className="dash">
+        <div className="card">
+          <h2 className="mono h2 spaced">SCAN A LOG FILE</h2>
+          <p className="small muted">Pick a log from your lab (Suricata <code>eve.json</code>, Wazuh <code>alerts.json</code>, a firewall or proxy log, a CSV). Sitrep looks for any IP, domain or file hash that was named in the last 30 days of security stories, and shows you where it appears.</p>
+          <button type="button" className="btn btn-primary" disabled={busy} onClick={run}>{busy ? 'Scanning…' : 'Choose a log file…'}</button>
+          {busy && <div className="scanbar" role="status" aria-label="Scanning the log"><span /></div>}
+          {msg && <div className="error small">{msg}</div>}
+        </div>
+        <div className="dash-side">
+          <div className="card">
+            <h2 className="mono h2 spaced">PRIVATE BY DESIGN</h2>
+            <ul className="small muted plain-list">
+              <li>The file is read once on this computer and never copied or uploaded.</li>
+              <li>Only short sample lines are shown here. Nothing is saved.</li>
+              <li>Plain-text logs only (not Windows .evtx). Stops at 4 GB or 2 minutes.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      {res && (
+        <div className="card span-all">
+          <div className="panel-head">
+            <strong className="actor-name">{res.file}</strong>
+            <span className={`tag ${res.hits.length ? 'tag-red' : 'tag-green'}`}>{res.hits.length ? `${res.hits.length} MATCHES` : 'NO MATCHES'}</span>
+          </div>
+          <div className="mono tiny muted">{res.lines.toLocaleString()} LINES · {mb(res.bytes)} MB · {res.checked.toLocaleString()} INDICATORS CHECKED{res.truncated ? ' · STOPPED EARLY' : ''}</div>
+          {res.hits.length === 0 && <p className="small">Nothing in this file matches indicators from recent stories. That is good news, but it only covers what the news has named, so it is not proof of a clean system.</p>}
+          <div className="cols-2">
+            {res.hits.map((h) => (
+              <div key={h.ioc} className="row hit">
+                <div><span className="mono">{h.ioc}</span> <span className="tag tag-grey">{h.kind.toUpperCase()}</span></div>
+                <div className="small">{h.count.toLocaleString()} {h.count === 1 ? 'time' : 'times'} · first at line {h.first_line.toLocaleString()}</div>
+                <code className="hit-sample">{h.sample}</code>
+                <div className="tiny muted">From story: {h.story_title}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </section>
   )
 }

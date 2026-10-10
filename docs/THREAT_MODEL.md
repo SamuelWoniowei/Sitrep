@@ -55,6 +55,9 @@ Sitrep is a single-user desktop app. It downloads public news feeds, stores them
 | T25 | **"Am I affected?" reading too much** | It reads only the names of installed programs (Windows uninstall registry keys via the system `reg.exe`), keeps nothing, sends nothing, and the UI cannot read the registry itself. | `intel.rs::installed_programs` |
 | T26 | **Lab pack writing unsafe or malicious rules** | Indicators are extracted by regex from untrusted article text, then restricted to strict character sets before being placed in any rule or CSV; lists are capped at 40 per type; private/reserved IPs and known-benign domains are skipped. Files are written to a fixed folder under Documents, named by date and story ID. Rules are labelled DRAFT / lab use only. | `intel.rs::extract_iocs`, `lab_pack_files` |
 | T27 | **Glossary / actor data being poisoned by AI output** | AI-added terms are plain-text, length-capped, deduplicated against built-in terms, capped at 15 active, and expire after 30 days. Actor profiles are built into the app, not generated. | `intel.rs` |
+| T28 | **Weekly digest page used for script injection or tracking** | The exported HTML escapes all feed-derived text, carries a CSP meta tag that blocks scripts and remote loads, and includes only https links. A plain-text copy is also written. | `digest.rs` |
+| T29 | **Log hunt reading or leaking sensitive files** | The scan is local and read-only, started from a native file dialog opened by Rust only. Caps: 4 GB, 120 s, 64 KB per line, 200 hits. Matches are sanitised and shortened. Nothing from the file is sent over the network. The UI has no file-system or dialog permission. | `hunt.rs`, `commands.rs` |
+| T30 | **Dialog plugin widening the attack surface** | `tauri-plugin-dialog` is used from Rust only. No dialog capability is granted to the webview. | `lib.rs`, capabilities |
 
 ## Residual risks (accepted, for now)
 

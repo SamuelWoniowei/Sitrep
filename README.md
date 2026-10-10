@@ -130,3 +130,9 @@ News comes from BleepingComputer, The Record, The Hacker News, the UK NCSC, the 
 - **Watchlist board** with 30-day counts and a 14-day sparkline per term; **Systems** page; "LIVE · N SOURCES" indicator; greeting by name (Settings → You); 16-week reading calendar.
 - "How the attack worked" strip on each story (estimated from the story's own words).
 - All new data is computed locally from the stored stories; no new network access.
+
+## v0.4.0 additions
+
+- **Weekly digest**: export a shareable HTML + text summary of the week (Sunday Sitrep page). Escaped, script-free, https links only.
+- **Attack replay**: step through a developing story as an animated attack timeline.
+- **Log hunt**: pick a local log file and scan it, read-only, against indicators from the last 30 days of stories. Nothing leaves your PC.

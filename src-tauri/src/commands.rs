@@ -889,3 +889,107 @@ mod tests {
         }
     }
 }
+
+// ---------------- weekly digest ----------------
+
+#[derive(Serialize)]
+pub struct DigestResult {
+    pub folder: String,
+    pub week: String,
+    pub stories: usize,
+    pub text: String,
+}
+
+#[tauri::command]
+pub fn export_digest(app: tauri::AppHandle, state: State<'_, AppState>) -> Res<DigestResult> {
+    use tauri::Manager;
+    let d = {
+        let s = lock(&state)?;
+        let name = s.setting("display_name").unwrap_or_default();
+        crate::digest::build(&s, now(), &name)
+    };
+    let base = app
+        .path()
+        .document_dir()
+        .or_else(|_| app.path().app_data_dir())
+        .map_err(|e| e.to_string())?;
+    let folder = base.join("Sitrep").join(format!("digest-{}", d.week));
+    std::fs::create_dir_all(&folder)
+        .map_err(|_| "Could not create the digest folder.".to_string())?;
+    std::fs::write(folder.join("sitrep-digest.html"), &d.html)
+        .map_err(|_| "Could not write the digest.".to_string())?;
+    std::fs::write(folder.join("sitrep-digest.txt"), &d.markdown)
+        .map_err(|_| "Could not write the digest.".to_string())?;
+    let _ = tauri_plugin_opener::reveal_item_in_dir(folder.join("sitrep-digest.html"));
+    Ok(DigestResult {
+        folder: folder.display().to_string(),
+        week: d.week,
+        stories: d.stories,
+        text: d.markdown,
+    })
+}
+
+// ---------------- log hunt ----------------
+
+/// Ask for a log file in a native dialog, then scan it locally for indicators
+/// from recent stories. Returns None if the person cancels.
+#[tauri::command]
+pub async fn hunt_logs(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Res<Option<crate::hunt::HuntResult>> {
+    use tauri_plugin_dialog::DialogExt;
+    let iocs = {
+        let s = lock(&state)?;
+        crate::hunt::collect(&s, now())
+    };
+    if iocs.is_empty() {
+        return Err("No indicators in recent stories yet. Refresh the news first.".into());
+    }
+    let checked = iocs.len();
+    let picked = tokio::task::spawn_blocking(move || {
+        app.dialog()
+            .file()
+            .add_filter("Log files", &["log", "json", "jsonl", "txt", "csv", "out"])
+            .blocking_pick_file()
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    let Some(picked) = picked else {
+        return Ok(None);
+    };
+    let path = picked
+        .into_path()
+        .map_err(|_| "Could not use that file.".to_string())?;
+    let meta = std::fs::metadata(&path).map_err(|_| "Could not read that file.".to_string())?;
+    if !meta.is_file() {
+        return Err("Pick a file, not a folder.".into());
+    }
+    if meta.len() > crate::hunt::MAX_BYTES {
+        return Err("That file is over 4 GB. Pick a smaller one.".into());
+    }
+    let name = path
+        .file_name()
+        .map(|n| crate::text::to_plain(&n.to_string_lossy(), 80))
+        .unwrap_or_default();
+    let res = tokio::task::spawn_blocking(move || {
+        let f = std::fs::File::open(&path).map_err(|_| "Could not open that file.".to_string())?;
+        let (lines, bytes, truncated, hits) = crate::hunt::scan(
+            f,
+            &iocs,
+            crate::hunt::MAX_BYTES,
+            std::time::Duration::from_secs(crate::hunt::MAX_SECONDS),
+        );
+        Ok::<_, String>(crate::hunt::HuntResult {
+            file: name,
+            lines,
+            bytes,
+            checked,
+            truncated,
+            hits,
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    Ok(Some(res))
+}

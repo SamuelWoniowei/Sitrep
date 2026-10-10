@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { playParts, unlockAudio } from './listen'
 import { CountUp } from './fx'
 import { animationsOn, setAnimations } from './prefs'
-import { api, errText, type AiStatus, type UpdateInfo, type BuiltItem, type Idea, type Project, type RadarRow, type Recap, type GlossEntry, type ActorSeen, type ExposureResult, type VoiceStatus, type WatchRow } from './api'
+import { api, errText, type AiStatus, type UpdateInfo, type BuiltItem, type Idea, type Project, type RadarRow, type Recap, type GlossEntry, type ActorSeen, type ExposureResult, type VoiceStatus, type WatchRow, type DigestResult } from './api'
 
 function useLoad<T>(fn: () => Promise<T>): [T | null, (v: T) => void, string | null, () => void] {
   const [data, setData] = useState<T | null>(null)
@@ -132,6 +132,38 @@ export function BuiltPage() {
   )
 }
 
+function DigestCard() {
+  const [d, setD] = useState<DigestResult | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+  const make = () => {
+    setBusy(true)
+    setMsg('')
+    api.exportDigest().then(setD).catch((e) => setMsg(errText(e))).finally(() => setBusy(false))
+  }
+  const copy = () => {
+    if (!d) return
+    navigator.clipboard.writeText(d.text).then(() => setMsg('Copied.')).catch(() => setMsg('Select the text and press Ctrl+C.'))
+  }
+  return (
+    <div className="card span-all">
+      <h2 className="mono h2 spaced">SHARE YOUR WEEK</h2>
+      <p className="small muted">Builds a clean one-page digest of this week's top stories, themes and threat actors. You get a web page file (open it, print it to PDF, or host it anywhere) and plain text ready to paste into LinkedIn. It is made on this computer; nothing is uploaded. Add your name in Settings → You to put it on the page.</p>
+      <div className="actions">
+        <button type="button" className="btn btn-primary" disabled={busy} onClick={make}>{busy ? 'Building…' : 'Build this week\'s digest'}</button>
+      </div>
+      {msg && <p className="small muted">{msg}</p>}
+      {d && (
+        <>
+          <p className="small accent">Saved {d.stories} stories for {d.week}. Folder: {d.folder}</p>
+          <textarea className="digest-text" readOnly value={d.text} aria-label="Digest text" />
+          <div className="actions"><button type="button" className="btn" onClick={copy}>Copy text</button></div>
+        </>
+      )}
+    </div>
+  )
+}
+
 export function RecapPage() {
   const [r, , err] = useLoad<Recap>(api.recap)
   const [picked, setPicked] = useState<Record<number, number>>({})
@@ -148,6 +180,7 @@ export function RecapPage() {
         ▶ Listen to the recap
       </button>
       <p className="muted small">{r.ready ? "It's Sunday: here's your week." : `Preview. The full recap lands in ${r.days_until} days.`} {r.story_count} stories in the last 7 days.</p>
+      <DigestCard />
       <div className="dash">
       <div className="card">
         <h2 className="mono h2 spaced">THEMES OF THE WEEK</h2>
