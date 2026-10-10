@@ -273,3 +273,69 @@ select { background: var(--chrome); border: 1px solid var(--field); border-radiu
 .watch-n { font-size: 22px; font-weight: 600; }
 .sys-row { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-top: 1px solid var(--line-2); }
 .sys-row:first-of-type { border-top: none; }
+
+/* v0.3.1: motion. All of this is switched off by Settings -> Motion and by reduced-motion. */
+@keyframes fill { from { width: 0; } }
+@keyframes grow { from { transform: scaleY(0); } }
+@keyframes needle { from { transform: rotate(-90deg); } }
+@keyframes wave { 0%, 100% { height: 4px; } 50% { height: 16px; } }
+@keyframes sweep { to { transform: rotate(360deg); } }
+@keyframes scan { 0% { left: -30%; } 100% { left: 100%; } }
+@keyframes glow { 0%, 100% { box-shadow: 0 0 0 0 rgba(229, 72, 77, 0); } 50% { box-shadow: 0 0 10px 1px rgba(229, 72, 77, .55); } }
+@keyframes textglow { 0%, 100% { text-shadow: none; } 50% { text-shadow: 0 0 14px rgba(229, 72, 77, .7); } }
+@keyframes stepglow { 0%, 60%, 100% { box-shadow: 0 0 0 0 rgba(56, 211, 159, 0); } 20% { box-shadow: 0 0 0 5px rgba(56, 211, 159, .35); } }
+@keyframes packet { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
+
+/* Everything on a page rises in, one after another. */
+section.page > .card, section.page > .row, section.page > .idea, section.page > .radar-row, .tiles .tile, .today > *, .grid > *, .side > * { animation: rise .55s ease-out both; }
+section.page > :nth-child(2), .tiles .tile:nth-child(2), .today > :nth-child(2), .grid > :nth-child(2) { animation-delay: .05s; }
+section.page > :nth-child(3), .tiles .tile:nth-child(3), .today > :nth-child(3) { animation-delay: .1s; }
+section.page > :nth-child(4), .tiles .tile:nth-child(4), .today > :nth-child(4) { animation-delay: .15s; }
+section.page > :nth-child(5), .tiles .tile:nth-child(5) { animation-delay: .2s; }
+section.page > :nth-child(6), .tiles .tile:nth-child(6) { animation-delay: .25s; }
+section.page > :nth-child(7), .tiles .tile:nth-child(7) { animation-delay: .3s; }
+section.page > :nth-child(n+8) { animation-delay: .35s; }
+
+.bar-fill { animation: fill 1.2s cubic-bezier(.2, .8, .2, 1) both; }
+.spark-bar { transform-origin: bottom; animation: grow .9s cubic-bezier(.2, .8, .2, 1) both; }
+.spark-bar:nth-child(odd) { animation-delay: .08s; }
+.cal-cell { animation: rise .6s ease-out both; }
+
+.tile .gauge { width: 100%; max-width: 150px; height: auto; display: block; margin: 2px 0; }
+.gauge path { fill: none; stroke-width: 9; stroke-linecap: butt; }
+.gauge-calm { stroke: #2f9e7a; }
+.gauge-mid { stroke: #d99a3d; }
+.gauge-high { stroke: #d9484d; }
+.gauge-needle line { stroke: var(--bright); stroke-width: 2.5; stroke-linecap: round; }
+.gauge-needle { animation: needle 1.6s cubic-bezier(.2, .8, .2, 1) both; }
+.gauge-hub { fill: var(--bright); }
+
+.wave { display: inline-flex; align-items: center; gap: 2px; height: 16px; margin-right: 6px; vertical-align: middle; }
+.wave-bar { width: 3px; height: 4px; border-radius: 2px; background: currentColor; animation: wave .9s ease-in-out infinite; }
+
+.radar { display: inline-block; width: 34px; height: 34px; border-radius: 50%; vertical-align: middle; margin-right: 10px; position: relative; overflow: hidden;
+  border: 1px solid var(--accent); background: radial-gradient(circle, transparent 0 30%, rgba(56, 211, 159, .18) 31% 33%, transparent 34% 62%, rgba(56, 211, 159, .18) 63% 65%, transparent 66%); }
+.radar::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(from 0deg, rgba(56, 211, 159, .55), rgba(56, 211, 159, 0) 28%); animation: sweep 3.6s linear infinite; }
+.h1-radar { display: flex; align-items: center; }
+
+.globe-packet { fill: #fff; filter: drop-shadow(0 0 3px #FFB066); animation: packet 1s ease-in-out infinite; pointer-events: none; }
+
+.tag-red { animation: glow 2.4s ease-in-out infinite; }
+.tile-n.red { animation: textglow 2.4s ease-in-out infinite; }
+
+.scanbar { position: relative; height: 4px; border-radius: 2px; background: var(--line-2); overflow: hidden; }
+.scanbar span { position: absolute; top: 0; bottom: 0; width: 30%; background: linear-gradient(90deg, transparent, var(--accent), transparent); animation: scan 1.4s linear infinite; }
+
+.flow-on .flow-dot { animation: stepglow 4s ease-in-out infinite; animation-delay: calc(var(--d, 0) * 0.7s + 1s); }
+.flow-on::before { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--accent), transparent); background-size: 40% 100%; background-repeat: no-repeat; animation: scan 3s linear infinite; animation-delay: calc(var(--d, 0) * 0.3s); }
+.flow-step { overflow: hidden; }
+
+.rail-item { transition: background .2s, border-color .2s, padding-left .2s; }
+.rail-item:hover { padding-left: 18px; }
+.btn, .chip { transition: background .15s, transform .1s; }
+.btn:active:not(:disabled) { transform: scale(.97); }
+.story { transition: background .2s; }
+.globe-hot { transition: fill .3s; }
+
+/* Live Ops lays out its own sections, so it is a plain column rather than a card grid. */
+section.page.page-wide { display: flex; flex-direction: column; align-items: stretch; }

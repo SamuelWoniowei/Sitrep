@@ -1,3 +1,4 @@
+import { CountUp, Gauge, Radar } from './fx'
 import { useEffect, useState } from 'react'
 import { api, errText, type LiveOps } from './api'
 import { Globe } from './Globe'
@@ -84,10 +85,11 @@ export function LiveOpsPage({ onOpenStory }: { onOpenStory: () => void }) {
   const node = d.map.nodes.find((n) => n.id === sel) ?? null
   return (
     <section className="panel page page-wide">
-      <h1 className="h1">Live ops</h1>
+      <h1 className="h1 h1-radar"><Radar /> Live ops</h1>
       <div className="tiles">
         <div className="tile" title="Based on how many exploited flaws CISA added in the last 7 days: under 4 calm, 4 to 11 elevated, 12 or more high.">
           <div className="mono tiny muted">THREAT TEMPERATURE</div>
+          <Gauge value={d.exploited_14d} label={temperature(d.exploited_14d).label} />
           <div className={`tile-n ${temperature(d.exploited_14d).cls}`}>{temperature(d.exploited_14d).label}</div>
         </div>
         <div className="tile">
@@ -95,11 +97,11 @@ export function LiveOpsPage({ onOpenStory }: { onOpenStory: () => void }) {
           <div className="tile-n">{nextPatchTuesday(new Date()).days === 0 ? 'Today' : `${nextPatchTuesday(new Date()).days} days`}</div>
           <div className="tiny muted">{nextPatchTuesday(new Date()).date.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' })}</div>
         </div>
-        <div className="tile"><div className="mono tiny muted">SOURCES</div><div className="tile-n">{d.sources}</div></div>
-        <div className="tile"><div className="mono tiny muted">STREAK</div><div className="tile-n accent">{d.streak}</div></div>
-        <div className="tile"><div className="mono tiny muted">EXPLOITED FLAWS ADDED (7D)</div><div className="tile-n red">{d.exploited_14d}</div></div>
-        <div className="tile"><div className="mono tiny muted">NEW STORIES TODAY</div><div className="tile-n">{d.new_today}</div></div>
-        <div className="tile"><div className="mono tiny muted">COUNTRIES IN THE NEWS</div><div className="tile-n">{d.map.nodes.length}</div></div>
+        <div className="tile"><div className="mono tiny muted">SOURCES</div><div className="tile-n"><CountUp to={d.sources} /></div></div>
+        <div className="tile"><div className="mono tiny muted">STREAK</div><div className="tile-n accent"><CountUp to={d.streak} /></div></div>
+        <div className="tile"><div className="mono tiny muted">EXPLOITED FLAWS ADDED (7D)</div><div className="tile-n red"><CountUp to={d.exploited_14d} /></div></div>
+        <div className="tile"><div className="mono tiny muted">NEW STORIES TODAY</div><div className="tile-n"><CountUp to={d.new_today} /></div></div>
+        <div className="tile"><div className="mono tiny muted">COUNTRIES IN THE NEWS</div><div className="tile-n"><CountUp to={d.map.nodes.length} /></div></div>
       </div>
 
       <h2 className="mono h2 spaced">WHERE IN THE WORLD (14 DAYS)</h2>
