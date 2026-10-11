@@ -93,6 +93,15 @@ export interface Idea {
 
 export interface RadarRow { theme: string; key: string; mentions: number; built: boolean }
 
+export interface MoreItem {
+  id: string
+  title: string
+  sources: string[]
+  published: number
+  category_label: string
+  has_link: boolean
+}
+
 export interface Today {
   day: string
   last_sync: number
@@ -146,6 +155,7 @@ export interface RefreshResult { new_stories: number; failed: string[]; skipped:
 export const api = {
   refresh: (force = false) => invoke<RefreshResult>('refresh', { force }),
   today: () => invoke<Today>('get_today'),
+  more: () => invoke<MoreItem[]>('get_more'),
   markRead: (id: string) => invoke<void>('mark_read', { id }),
   openStory: (id: string) => invoke<void>('open_story', { id }),
   aiStatus: () => invoke<AiStatus>('ai_status'),

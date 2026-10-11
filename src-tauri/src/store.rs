@@ -477,6 +477,20 @@ impl Store {
             .flatten();
         s.and_then(|s| serde_json::from_str(&s).ok())
     }
+    /// Story ids that were in any brief before `day`, so a new day can lead with fresh stories.
+    pub fn past_brief_ids(&self, day: &str) -> std::collections::HashSet<String> {
+        let mut out = std::collections::HashSet::new();
+        if let Ok(mut st) = self.conn.prepare("SELECT ids FROM briefs WHERE day<?1") {
+            if let Ok(rows) = st.query_map(params![day], |r| r.get::<_, String>(0)) {
+                for j in rows.flatten() {
+                    if let Ok(v) = serde_json::from_str::<Vec<String>>(&j) {
+                        out.extend(v);
+                    }
+                }
+            }
+        }
+        out
+    }
     pub fn set_brief(&self, day: &str, ids: &[String]) -> rusqlite::Result<()> {
         self.conn.execute(
             "INSERT OR REPLACE INTO briefs(day,ids) VALUES(?1,?2)",

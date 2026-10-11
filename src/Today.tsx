@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api, errText, type Idea, type Quiz, type Today as TodayData } from './api'
+import { api, errText, type Idea, type MoreItem, type Quiz, type Today as TodayData } from './api'
 import { StoryCard } from './StoryCard'
 import { IntelWall } from './ops'
 import { CountUp, FunFact, Pulse } from './fx'
@@ -10,6 +10,13 @@ interface Props {
   aiReady: boolean
   reload: () => Promise<void>
   go: (p: Page) => void
+}
+
+function agoShort(ts: number): string {
+  const h = Math.max(0, Math.round((Date.now() / 1000 - ts) / 3600))
+  if (h < 1) return 'just now'
+  if (h < 48) return `${h}h ago`
+  return `${Math.round(h / 24)}d ago`
 }
 
 export function Today({ data, aiReady, reload, go }: Props) {
@@ -50,6 +57,9 @@ export function Today({ data, aiReady, reload, go }: Props) {
   const unread = total - data.read_count
   const [name, setName] = useState('')
   useEffect(() => { api.getName().then(setName).catch(() => {}) }, [])
+  const [more, setMore] = useState<MoreItem[]>([])
+  useEffect(() => { api.more().then((l) => setMore(Array.isArray(l) ? l : [])).catch(() => setMore([])) }, [data.last_sync])
+  const openMore = (id: string) => { api.openStory(id).catch(() => {}) }
 
   return (
     <div className="today">
@@ -107,6 +117,18 @@ export function Today({ data, aiReady, reload, go }: Props) {
           ))}
           {total > 0 && data.read_count === total && (
             <div className="done-note">That's it for today. Nothing else needs your attention.</div>
+          )}
+          {more.length > 0 && (
+            <div className="more">
+              <div className="mono small muted more-head">MORE NEWS · NEWEST FIRST</div>
+              {more.map((m) => (
+                <button key={m.id} type="button" className="more-row" disabled={!m.has_link} onClick={() => openMore(m.id)}>
+                  <span className="small more-title">{m.title}</span>
+                  <span className="mono tiny muted">{m.sources.slice(0, 2).join(' · ')} · {agoShort(m.published)}</span>
+                </button>
+              ))}
+              <div className="tiny muted">These open the original article in your browser.</div>
+            </div>
           )}
         </section>
 
