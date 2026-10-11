@@ -52,3 +52,48 @@ jobs:
           $files | Get-FileHash -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" } | Set-Content SHA256SUMS.txt
           Get-Content SHA256SUMS.txt
           gh release upload "v$env:VERSION" SHA256SUMS.txt --clobber
+
+  # Apple-silicon Mac build. Runs after the Windows job so both attach to the
+  # same draft release and the update list (latest.json) gets both platforms.
+  # The app is not Apple-signed: first launch needs right-click, Open.
+  macos:
+    needs: windows
+    runs-on: macos-latest
+    environment: release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+      - run: npm ci
+      - name: Tests before release
+        working-directory: src-tauri
+        run: cargo test --locked
+      - name: Build, sign the update and add to the draft release
+        id: tauri
+        uses: tauri-apps/tauri-action@2d793bf2c8c505b9b76211601b09aab48922225d # v1.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          args: --bundles app,dmg
+          tagName: v__VERSION__
+          releaseName: 'Sitrep v__VERSION__'
+          releaseBody: 'Install: download the -setup.exe below and check its SHA-256 against SHA256SUMS.txt. Existing installs: Settings → Check for updates.'
+          releaseDraft: true
+          prerelease: false
+          uploadUpdaterJson: true
+      - name: Publish SHA-256 checksums (Mac)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.tauri.outputs.appVersion }}
+        run: |
+          cd src-tauri/target/release/bundle/dmg
+          shasum -a 256 *.dmg | tee ../../../../../SHA256SUMS-macos.txt
+          cd ../../../../..
+          gh release upload "v$VERSION" SHA256SUMS-macos.txt --clobber
