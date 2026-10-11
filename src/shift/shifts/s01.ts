@@ -1,51 +1,19 @@
-// Shift 1 scenario data: Harlow & Finch Logistics, a fictional company.
-// Every name, domain and IP is invented (IPs come from documentation ranges
-// 192.0.2.0/24, 198.51.100.0/24 and 203.0.113.0/24). Nothing here touches a
-// real system. Adding another shift means adding another file like this one.
+// Shift 1: Harlow & Finch Logistics, a fictional company. Business email
+// compromise via MFA fatigue. Every name, domain and IP is invented (outside IPs
+// come from documentation ranges 192.0.2.0/24, 198.51.100.0/24 and 203.0.113.0/24,
+// plus two residential-looking examples used in the decoys). Nothing here
+// touches a real system.
+import { hm, m, makeScenario, memo } from '../common'
+import type { Alert, Containment, GameView, ShiftDef, TimelineRow, User, Val, Verdict, Wrong } from '../types'
 
-export type Src = 'entra' | 'entraaudit' | 'exchange' | 'mail' | 'proxy' | 'edr' | 'vpn' | 'ad'
-export type Val = string | number
-export interface Ev {
-  id: string
-  src: Src
-  ts: number // seconds from today 00:00 UTC; yesterday is negative
-  f: Record<string, Val>
-  key?: string
-  tag?: string
-  cond?: 'bec'
-}
-export type Sev = 'low' | 'med' | 'high'
-export type Verdict = 'incident' | 'fp' | 'benign' | 'it' | 'insider'
-export interface Alert {
-  id: string
-  title: string
-  sev: Sev
-  src: string
-  ent: string
-  at: number
-  sla: number
-  raw: string
-  rule: string
-  kv: [string, string][]
-  best: Verdict
-  alt: Partial<Record<Verdict, number>>
-  req: string[]
-  why: string
-  hints: string[]
-  late?: 'bec'
-}
-
-export const hm = (h: number, m: number, s = 0): number => h * 3600 + m * 60 + s
-export const START = hm(8, 30)
-export const END = hm(11, 0)
+export const SHIFT_ID = 'soc-1'
 export const DOM = 'harlowfinch.example'
 export const OFFICE = '203.0.113.11'
 export const ATT = '198.51.100.77'
 export const PHD = 'login-micros0ft-secure.com'
 export const PHM = 'remit@brightpath-pay.co'
-export const SHIFT_ID = 'soc-1'
 
-export const FIELDS: Record<Src, string> = {
+const FIELDS: Record<string, string> = {
   entra: 'user ip geo app dev os result mfa',
   entraaudit: 'user op app publisher scopes ip',
   exchange: 'user op detail ip',
@@ -55,7 +23,7 @@ export const FIELDS: Record<Src, string> = {
   vpn: 'ip user result reason',
   ad: 'actor op target group dc',
 }
-export const SRCDESC: Record<Src, string> = {
+const SRCDESC: Record<string, string> = {
   entra: 'Entra ID sign-in logs',
   entraaudit: 'Entra ID audit (consents, app changes)',
   exchange: 'Exchange Online mailbox audit',
@@ -66,17 +34,7 @@ export const SRCDESC: Record<Src, string> = {
   ad: 'Active Directory domain controller',
 }
 
-function mulberry(seed: number): () => number {
-  let a = seed | 0
-  return () => {
-    a = (a + 0x6d2b79f5) | 0
-    let t = Math.imul(a ^ (a >>> 15), 1 | a)
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-}
 
-export interface User { n: string; host: string; dept: string; dev: string; ip: string }
 const USER_ROWS: [string, string, string, string][] = [
   ['jenna.hart', 'FIN-WS-019', 'Finance', 'b7f2a0'], ['aisha.khan', 'FIN-WS-021', 'Finance', 'a14c92'],
   ['marcus.o', 'FIN-WS-016', 'Finance', 'e03b71'], ['lena.fischer', 'FIN-WS-011', 'Finance', '5d8e12'],
@@ -87,9 +45,10 @@ const USER_ROWS: [string, string, string, string][] = [
   ['olu.adeyemi', 'IT-WS-002', 'IT', 'd70a49'], ['greg.shaw', 'OPS-WS-011', 'Ops', '6c13f5'],
   ['nina.k', 'HR-WS-004', 'HR', '4af2b8'], ['adm.collins', 'INFRA-WS-001', 'IT', '1e77d9'],
 ]
-export const USERS: User[] = USER_ROWS.map((a, i) => ({ n: a[0], host: a[1], dept: a[2], dev: a[3], ip: `10.20.${10 + i}.${20 + i * 3}` }))
-export const BY_NAME: Record<string, User> = Object.fromEntries(USERS.map((u) => [u.n, u]))
+const USERS: User[] = USER_ROWS.map((a, i) => ({ n: a[0], host: a[1], dept: a[2], dev: a[3], ip: `10.20.${10 + i}.${20 + i * 3}` }))
+const BY_NAME: Record<string, User> = Object.fromEntries(USERS.map((u) => [u.n, u]))
 const FIN = USERS.filter((u) => u.dept === 'Finance')
+
 
 const APPS = ['Office365 Web', 'Outlook Desktop', 'Teams', 'SharePoint', 'Sage 50', 'Xero']
 const SITES: [string, string, number][] = [
@@ -104,20 +63,11 @@ const SITES: [string, string, number][] = [
 ]
 const SUPP = ['accounts@maersk-logistics.example', 'orders@dpd-freight.example', 'billing@pallet-network.example', 'noreply@sage.example', 'invoices@fuelcard-uk.example', 'team@lloydsfleet.example', 'updates@linkedin.example', 'hr@harlowfinch.example', 'it-notices@harlowfinch.example']
 const SUBJ = ['Invoice 20441 attached', 'Your weekly statement', 'Delivery manifest 3318', 'Remittance advice 4468', 'Fuel card statement - March', 'Meeting moved to 14:00', 'Policy reminder: clear desk', 'Team lunch Friday?', 'Re: pallet shortfall - Leeds depot', 'Customs entry confirmation', 'Timesheet reminder', 'Q1 forecast - draft']
-export const B64 = 'RwBlAHQALQBDAGkAbQBJAG4AcwB0AGEAbgBjAGUAIABXAGkAbgAzADIAXwBQAHIAbwBkAHUAYwB0ACAAfAAgAFMAZQBsAGUAYwB0AC0ATwBiAGoAZQBjAHQAIABOAGEAbQBlACwAVgBlAHIAcwBpAG8AbgAgAHwAIABFAHgAcABvAHIAdAAtAEMAcwB2ACAAQwA6AFwAVwBpAG4AZABvAHcAcwBcAEMAQwBNAFwAaQBuAHYALgBjAHMAdgAgAC0ATgBvAFQAeQBwAGUASQBuAGYAbwByAG0AYQB0AGkAbwBuAA=='
+const B64 = 'RwBlAHQALQBDAGkAbQBJAG4AcwB0AGEAbgBjAGUAIABXAGkAbgAzADIAXwBQAHIAbwBkAHUAYwB0ACAAfAAgAFMAZQBsAGUAYwB0AC0ATwBiAGoAZQBjAHQAIABOAGEAbQBlACwAVgBlAHIAcwBpAG8AbgAgAHwAIABFAHgAcABvAHIAdAAtAEMAcwB2ACAAQwA6AFwAVwBpAG4AZABvAHcAcwBcAEMAQwBNAFwAaQBuAHYALgBjAHMAdgAgAC0ATgBvAFQAeQBwAGUASQBuAGYAbwByAG0AYQB0AGkAbwBuAA=='
 
-export interface Scenario { events: Ev[]; byKey: Record<string, Ev> }
-let cached: Scenario | null = null
 
-export function scenario(): Scenario {
-  if (cached) return cached
-  const R = mulberry(20260317)
-  const pick = <T,>(a: T[]): T => a[Math.floor(R() * a.length)]
-  const ri = (a: number, b: number): number => a + Math.floor(R() * (b - a + 1))
-  const EV: Omit<Ev, 'id'>[] = []
-  const ev = (src: Src, ts: number, f: Record<string, Val>, o: { key?: string; tag?: string; cond?: 'bec' } = {}) => {
-    EV.push({ src, ts, f, key: o.key, tag: o.tag, cond: o.cond })
-  }
+export const build = memo(() => makeScenario(20260317, (G) => {
+  const { R, pick, ri, ev } = G
 
   for (const d of [-1, 0]) {
     const base = d * 86400
@@ -200,17 +150,9 @@ export function scenario(): Scenario {
   ev('ad', hm(9, 31, 10), { actor: 'adm.collins', op: 'Member added to Backup Operators', target: 'svc-backup2', group: 'Backup Operators', dc: 'DC01' })
   ev('ad', hm(9, 44, 52), { actor: 'adm.collins', op: 'Member added to Domain Admins', target: 'svc-backup2', group: 'Domain Admins', dc: 'DC01' }, { key: 'e_da', tag: 'a8raw' })
 
-  EV.sort((a, b) => a.ts - b.ts)
-  const events: Ev[] = EV.map((e, i) => ({ ...e, id: `E${1000 + i}` }))
-  const byKey: Record<string, Ev> = {}
-  for (const e of events) if (e.key) byKey[e.key] = e
-  cached = { events, byKey }
-  return cached
-}
+}))
 
-const m = (n: number): number => n * 60
-
-export const ALERTS: Alert[] = [
+const ALERTS: Alert[] = [
   { id: 'A1', title: 'Web proxy: POST to newly registered domain', sev: 'low', src: 'Web proxy', ent: 'FIN-WS-019', at: hm(8, 30), sla: m(120), raw: 'a1raw',
     rule: 'Outbound POST to a domain registered less than 14 days ago. Often a SaaS sign-up, an analytics beacon, or a form on a freshly set-up marketing site.',
     kv: [['User', 'jenna.hart'], ['Host', 'FIN-WS-019'], ['Domain age', '3 days'], ['Category', 'uncategorized'], ['Proxy action', 'allowed (monitor mode)']],
@@ -226,7 +168,7 @@ export const ALERTS: Alert[] = [
   { id: 'A3', title: 'VPN gateway: 412 failed logins from one /24', sev: 'low', src: 'VPN', ent: 'vpn-gw01', at: hm(8, 30), sla: m(120), raw: 'a3raw',
     rule: 'More than 100 failed VPN authentications from a single /24 within 30 minutes.',
     kv: [['Source range', '192.0.2.0/24'], ['Window', '08:05 - 08:27'], ['Targets', '13 account names, some not real'], ['MFA on VPN', 'Enforced']],
-    best: 'benign', alt: { fp: 50 }, req: ['c_vpn'],
+    best: 'benign', alt: { fp: 50 }, req: ['c_vpn'], rawNote: '   ... 409 more failures from 192.0.2.0/24',
     why: 'Background internet credential spraying. The question that matters is whether any attempt succeeded, and none did. Blocking the range is a nice extra, not an incident.',
     hints: ['Failures are noise. Did any attempt from that range succeed?'] },
   { id: 'A4', title: 'Entra ID: sign-in from a new country (India)', sev: 'low', src: 'Entra ID', ent: 'priya.singh', at: hm(8, 30), sla: m(120), raw: 'a4raw',
@@ -260,18 +202,8 @@ export const ALERTS: Alert[] = [
     why: 'There is a change ticket (CHG-2240), but it approves Backup Operators on DC01, not Domain Admins. This looks like a mistake, but a service account with domain-admin rights is dangerous either way. The right call is to hand it to IT change management and have the extra group removed.',
     hints: ['Is there a change ticket? Compare what it approves with what actually happened.'] },
 ]
-export const ALERT_BY_ID: Record<string, Alert> = Object.fromEntries(ALERTS.map((a) => [a.id, a]))
 
-export const VERDICTS: [Verdict, string][] = [
-  ['incident', 'Escalate: security incident'],
-  ['fp', 'Close: false positive (rule was wrong)'],
-  ['benign', 'Close: expected activity (rule right, nothing bad)'],
-  ['it', 'Hand to IT / Ops'],
-  ['insider', 'Escalate: HR + insider risk'],
-]
-export const VLABEL: Record<string, string> = Object.fromEntries(VERDICTS)
-
-export const EVD: Record<string, string> = {
+const EVD: Record<string, string> = {
   e_mail_deliv: 'Phishing email delivered 07:41 (mail trace)',
   e_post: 'Credentials POSTed to look-alike login page (proxy)',
   e_click: 'Link clicked by Jenna 07:47',
@@ -290,15 +222,164 @@ export const EVD: Record<string, string> = {
   c_ticket: 'Compared the change ticket to the actual change',
 }
 
-// Facts the note-feedback AI is given. Trusted, built-in text.
-export function noteFacts(a: Alert): string {
-  return [
-    `Alert: ${a.title} (${a.ent}).`,
-    `The correct call was: ${VLABEL[a.best]}.`,
-    `What really happened: ${a.why}`,
-    `A good handover note covers: ${a.req.map((r) => EVD[r]).join('; ')}.`,
-    a.best === 'incident' ? 'It should also say what was contained and what still needs doing (account, mailbox rule, OAuth app, phishing domain and mail, finance team).' : 'It should say why nothing needs escalating.',
-  ].join('\n')
+
+const TI: Record<string, string> = {
+  [ATT]: 'AS64500 HostBulk LLC · Bucharest, RO · commercial hosting / VPS range\n23 abuse reports in the last 7 days (phishing, credential stuffing)\nNot a corporate network. Not a known consumer VPN provider.\nReputation: MALICIOUS',
+  [PHD]: 'Reputation: MALICIOUS · 31 of 90 engines flag it\nTyposquat of a Microsoft sign-in page (the "o" in "micros0ft" is a zero)\nMatches a credential-harvest kit fingerprint · first seen 03-14',
+  'brightpath-pay.co': 'Reputation: SUSPICIOUS · registered 4 days ago\nSending infrastructure for 6 other phishing campaigns this week\nOften used as a forwarding / drop address for stolen mail',
+  '203.0.113.11': 'Harlow & Finch corporate egress (internal address)',
+  '49.36.140.22': 'Consumer mobile ISP · Mumbai, IN · no abuse history',
+  '82.31.14.9': 'Residential broadband · Sheffield, GB · no abuse history',
+  'trade-expo-2026.eu': 'Reputation: CLEAN · small events site, registered 21 days ago, 3 visits from H&F',
 }
 
-export const CALLABLE = ['jenna.hart', 'priya.singh', 'aisha.khan', 'marcus.o', 'david.cole', 'adm.collins']
+const WHOIS: Record<string, string> = {
+  [PHD]: "Domain:      login-micros0ft-secure.com\nCreated:     03-14 (3 days ago)\nRegistrar:   privacy-protected\nNameserver:  cloudflare\nTLS cert:    Let's Encrypt, issued 03-14",
+  'brightpath-pay.co': 'Domain:      brightpath-pay.co\nCreated:     03-13 (4 days ago)\nRegistrar:   privacy-protected\nMX:          yes (receives mail)',
+  'trade-expo-2026.eu': 'Domain:      trade-expo-2026.eu\nCreated:     02-24 (21 days ago)\nRegistrant:  Expo Events Ltd (visible)\nMX:          yes',
+  'brightfreight.example': 'Domain:      brightfreight.example\nCreated:     2011\nRegistrant:  Bright Freight Ltd (existing H&F supplier)',
+}
+
+const PHONE: Record<string, string> = {
+  'jenna.hart': 'Jenna Hart (desk 2214):\n"My phone kept buzzing around eight. I thought the app was glitching, so I tapped Approve to make it stop. Did I do something wrong?"\nShe did not start a sign-in from Romania. She was at her desk. She also remembers clicking a remittance link earlier and typing her password into "the Microsoft page".',
+  'priya.singh': 'Priya Singh:\n"Yes that was me. I landed in Mumbai this morning for the partner conference and I am on my work laptop."',
+  'aisha.khan': 'Aisha Khan:\n"I clicked the remittance link but the page looked off, so I closed it. I did not type anything."',
+  'marcus.o': 'Marcus O.:\n"Opened it, thought the address looked odd, closed it. Nothing typed."',
+  'david.cole': 'David Cole:\n"I am not running anything special. My machine did slow down for a minute around half eight."',
+  'adm.collins': 'Adam Collins (infra):\n"Oh no. I picked Domain Admins from the dropdown instead of Backup Operators. Can you get it reverted?"',
+}
+const BADGE: Record<string, string> = { 'jenna.hart': 'Main entrance IN 07:32 · no OUT recorded · swipe at finance floor 07:34. Physically in the building.', 'priya.singh': 'No badge activity for 3 days (travelling).' }
+const HR: Record<string, string> = {
+  'jenna.hart': 'Accounts Payable · full-time · no leave booked · line manager: finance director.',
+  'priya.singh': 'Sales Executive · APPROVED business travel Sheffield to Mumbai 03-16 to 03-21 (partner conference) · company laptop issued.',
+  'adm.collins': 'Infrastructure admin · joined 2019 · no concerns on file.',
+}
+const TICKET: Record<string, string> = { 'chg-2240': 'CHG-2240 · Approved · requester adm.collins\nScope: add svc-backup2 to BACKUP OPERATORS on DC01\nWindow: 09:30 - 10:30 today\nNotes: needed for new backup agent. No domain-level privileges requested.' }
+
+function askIT(q: string): string {
+  if (/sccm|inventory|powershell|encod|8:3|ccm/i.test(q)) return 'Platform team: SCCM software inventory runs daily at 08:30 on every managed workstation. The encoded script is the standard CCM inventory export.'
+  if (/vpn|spray|192\.0\.2|brute/i.test(q)) return 'Network team: that range hits the VPN every few days. MFA is enforced and nothing has got through historically.'
+  if (/jenna|rule|forward|consent|docsync/i.test(q)) return 'Helpdesk: no ticket from Jenna today. DocSyncPro is not on our approved app list.'
+  return 'IT: not sure, can you raise a ticket?'
+}
+
+
+const CONTAIN: Containment[] = [
+  { label: "Revoke Jenna's sessions", pts: 40, t: (g) => g.actions.has('revoke-sessions jenna.hart') },
+  { label: "Reset Jenna's password", pts: 40, t: (g) => g.actions.has('reset-password jenna.hart') },
+  { label: 'Delete the hidden inbox rule', pts: 40, t: (g) => g.actions.has('delete-rule jenna.hart') },
+  { label: 'Revoke the DocSyncPro consent', pts: 40, t: (g) => g.actions.has('revoke-consent jenna.hart docsyncpro') },
+  { label: `Block ${PHD}`, pts: 30, t: (g) => g.actions.has(`block-domain ${PHD}`) },
+  { label: 'Block brightpath-pay.co', pts: 30, t: (g) => g.actions.has('block-domain brightpath-pay.co') },
+  { label: 'Purge the phishing email from all mailboxes', pts: 40, t: (g) => g.actions.has('purge-mail remittance advice 4471') },
+  { label: `Block ${ATT}`, pts: 20, t: (g) => g.actions.has(`block-ip ${ATT}`) },
+  { label: 'Remove svc-backup2 from Domain Admins', pts: 40, t: (g) => g.actions.has('remove-group svc-backup2 domain admins') },
+  { label: 'Block the 192.0.2.0/24 spray range', pts: 15, t: (g) => g.actions.has('block-ip 192.0.2.0/24') },
+]
+const WRONG: Wrong[] = [
+  { label: 'Isolated FIN-WS-014 (running legitimate SCCM)', pts: -50, t: (g) => g.actions.has('isolate fin-ws-014') },
+  { label: 'Disabled priya.singh (legitimate traveller)', pts: -50, t: (g) => g.actions.has('disable-user priya.singh') },
+  { label: 'Blocked the corporate egress IP 203.0.113.11 (outage)', pts: -80, t: (g) => g.actions.has('block-ip 203.0.113.11') },
+  { label: 'Disabled adm.collins on a hunch', pts: -40, t: (g) => g.actions.has('disable-user adm.collins') },
+  { label: 'Isolated a host with no evidence against it', pts: -30, t: (g) => [...g.actions].some((x) => x.startsWith('isolate ') && !['isolate fin-ws-019', 'isolate fin-ws-014'].includes(x)) },
+]
+
+const CHECKS: Record<string, (g: GameView) => boolean> = {
+  c_vpn: (g) => g.hist.some((h) => /source=vpn/i.test(h) && (/result=(success|\*|"?s)/i.test(h) || (/stats|top/i.test(h) && /result/i.test(h)))),
+  c_priya: (g) => g.hist.some((h) => /^(hr|phone)\s+priya\.singh/i.test(h)),
+  c_decode: (g) => g.hist.some((h) => /^b64\s+/i.test(h) || (/source=edr/i.test(h) && /-enc|powershell/i.test(h) && /stats|top|dedup/i.test(h))),
+  c_ticket: (g) => g.hist.some((h) => /^ticket\s+chg-2240/i.test(h)),
+}
+
+function timeline(k: Set<string>, g: GameView): TimelineRow[] {
+  const rows: TimelineRow[] = [
+    { at: hm(7, 41), text: 'Phishing email "Remittance advice 4471" delivered to 10 Finance users', ttp: 'T1566.002 Spearphishing link', found: k.has('e_mail_deliv') },
+    { at: hm(7, 48), text: 'Jenna types her password into a fake Microsoft sign-in page', ttp: 'T1056.003 / T1078 Valid accounts', found: k.has('e_post') },
+    { at: hm(8, 3), text: 'Attacker logs in with the stolen password and sends 11 MFA pushes', ttp: 'T1621 MFA request generation', found: k.has('e_office_signin') || k.has('e_success_foreign') },
+    { at: hm(8, 13), text: 'Jenna approves a push. Attacker is in from a Romanian hosting IP', ttp: 'T1078.004 Cloud accounts', found: k.has('e_success_foreign') },
+    { at: hm(8, 19), text: 'Hidden inbox rule forwards finance mail to an external address', ttp: 'T1114.003 Email forwarding rule', found: k.has('e_rule') },
+    { at: hm(8, 22), text: 'Malicious OAuth app "DocSyncPro" granted persistent mail and file access', ttp: 'T1528 Steal application access token', found: k.has('e_consent') || g.actions.has('revoke-consent jenna.hart docsyncpro') },
+  ]
+  if (g.flags.bec) rows.push({ at: hm(9, 17), text: 'Fraudulent "updated bank details" email sent to a real supplier', ttp: 'T1657 Financial theft (BEC)', found: k.has('e_bec') })
+  return rows
+}
+
+const TI_RULES: [RegExp, string][] = [
+  [/^192\.0\.2\./, 'Range seen in ~1,900 abuse reports per day · generic internet scanner / credential-spray botnet · no targeted activity against H&F'],
+]
+
+// A note-feedback helper line for the AI. Trusted, built-in text.
+const noteTail = (a: Alert): string =>
+  a.best === 'incident'
+    ? 'It should also say what was contained and what still needs doing (account, mailbox rule, OAuth app, phishing domain and mail, finance team).'
+    : 'It should say why nothing needs escalating.'
+
+export const shift1: ShiftDef = {
+  id: SHIFT_ID,
+  title: 'Harlow & Finch: the invoice that was not',
+  company: 'Harlow & Finch Logistics',
+  level: 'Medium',
+  blurb: 'Business email compromise through MFA fatigue. Three alerts are one incident, three are noise, one is a judgment call.',
+  intro:
+    'You are the only analyst on the morning shift at Harlow & Finch Logistics, a fictional 420-person freight company, from 08:30 to 11:00. Nobody will tell you which alerts matter. The rules are noisy, the logs look real, and some of what looks scary is routine.',
+  start: hm(8, 30),
+  end: hm(11, 0),
+  dates: ['03-16', '03-17'],
+  fields: FIELDS,
+  srcdesc: SRCDESC,
+  users: USERS,
+  build,
+  alerts: ALERTS,
+  evd: EVD,
+  intel: {
+    ti: TI,
+    tiRules: TI_RULES,
+    whois: WHOIS,
+    phone: PHONE,
+    badge: BADGE,
+    hr: HR,
+    tickets: TICKET,
+    askIt: askIT,
+    protectedIps: { '203.0.113.11': 'this is the corporate egress address. Staff report they cannot reach Microsoft 365.' },
+    phoneBusy: (u, clock) => (u === 'adm.collins' && clock < hm(9, 45) ? 'Adam Collins is in a meeting, no answer.' : null),
+  },
+  callable: ['jenna.hart', 'priya.singh', 'aisha.khan', 'marcus.o', 'david.cole', 'adm.collins'],
+  triggers: [
+    {
+      flag: 'bec',
+      at: hm(9, 15),
+      contained: (g) => (g.actions.has('revoke-sessions jenna.hart') && g.actions.has('reset-password jenna.hart')) || g.actions.has('disable-user jenna.hart'),
+      penalty: 100,
+      penaltyLabel: 'Fraudulent email sent',
+      okLog: "Jenna's account contained before 09:15",
+      note: (done, happened) =>
+        !done ? 'The shift ended before the 09:15 deadline for the bank-details email.' : happened ? 'The attacker sent the bank-details email before you contained the account.' : 'You contained the account before the fraudulent email went out.',
+    },
+  ],
+  contain: [...CONTAIN, { label: 'Notify Finance about the fraudulent bank-details email', pts: 30, t: (g) => g.actions.has('notify-finance'), when: (g) => !!g.flags.bec }],
+  wrong: WRONG,
+  checks: CHECKS,
+  timeline,
+  gaps: [
+    'MFA number matching was off, so approve-to-stop-it worked.',
+    'No Conditional Access requiring a compliant device or known location for mail.',
+    'Users could consent to unverified apps without admin approval.',
+    'The proxy only monitored newly registered domains instead of blocking them.',
+    'External auto-forwarding was not blocked.',
+    'The inbox-rule alert fired 31 minutes after the rule was created.',
+  ],
+  noteTail,
+  chips: ['help', 'fields entra', 'source=proxy domain=*microsoft* | stats count by domain', 'source=entra user=jenna.hart | table time,ip,geo,result,mfa', 'ti 198.51.100.77'],
+  cheat: `source=entra user=jenna.hart result=success
+source=proxy domain=*microsoft* | stats count by domain
+source=mail rcpt=jenna.hart* | sort -time | head 5
+ti 198.51.100.77     whois some-domain.com     b64 <string>
+phone priya.singh    revoke-sessions jenna.hart     help`,
+  solution: {
+    cmds: ['source=entra user=jenna.hart', 'revoke-sessions jenna.hart', 'reset-password jenna.hart', 'delete-rule jenna.hart', 'revoke-consent jenna.hart DocSyncPro', `block-domain ${PHD}`, 'block-domain brightpath-pay.co', 'purge-mail Remittance advice 4471', `block-ip ${ATT}`, 'source=vpn result=success', 'hr priya.singh', 'b64 x', 'ticket chg-2240', 'remove-group svc-backup2 domain admins'],
+    verdicts: [['A1', 'incident'], ['A2', 'incident'], ['A3', 'benign'], ['A4', 'benign'], ['A5', 'benign'], ['A6', 'incident'], ['A8', 'it']],
+    pins: {
+      A1: ['e_mail_deliv', 'e_post'], A2: ['e_success_foreign', 'e_office_signin'], A4: ['e_priya_signin'], A5: ['e_ps'], A6: ['e_rule', 'e_success_foreign'], A8: ['e_da'],
+    },
+  },
+}
