@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, errText, type NoteFeedback, type ShiftResult } from './api'
-import type { Alert, Ev, ShiftDef, Verdict } from './shift/types'
+import type { Alert, Ev, Sev, ShiftDef, Verdict } from './shift/types'
 import { LEVELS, SHIFTS } from './shift/index'
 import {
-  VERDICTS, VLABEL, alertById, exec, advance, endShift, evById, gradeAlert, gradeContain, isPinned, maxScore, newGame, noteFacts,
+  ACK_MIN, ESC_FIELDS, WIP_MAX, VERDICTS, VLABEL, addNote, alertById, gradeTicket, inProgress, ticketStatus, trueSev, type Escalation, exec, advance, endShift, evById, gradeAlert, gradeContain, isPinned, maxScore, newGame, noteFacts,
   openAlerts, reqMet, scn, submitVerdict, timeline, togglePin, total, visible, type Block, type Game, type Item, type Mode,
 } from './shift/engine'
 
@@ -11,6 +11,7 @@ const hmShort = (ts: number): string => {
   const t = ((ts % 86400) + 86400) % 86400
   return `${String(Math.floor(t / 3600)).padStart(2, '0')}:${String(Math.floor((t % 3600) / 60)).padStart(2, '0')}`
 }
+const ackLeft = (g: Game, a: Alert): number => Math.round((a.at + ACK_MIN[a.sev] * 60 - g.clock) / 60)
 const hmsOf = (dates: [string, string], ts: number): string => `${ts < 0 ? dates[0] : dates[1]} ${hmShort(ts)}:${String(((ts % 60) + 60) % 60).padStart(2, '0')}`
 const rawTextOf = (dates: [string, string], e: Ev): string => `${hmsOf(dates, e.ts)}  ${e.src.padEnd(10)} ${Object.entries(e.f).map(([k, v]) => `${k}=${/[\s"]/.test(String(v)) ? `"${String(v).replace(/"/g, "'")}"` : v}`).join(' ')}`
 
@@ -93,6 +94,9 @@ export function ShiftPage({ aiReady }: { aiReady: boolean }) {
   const [def, setDef] = useState<ShiftDef>(SHIFTS[0])
   const [vsel, setVsel] = useState<Verdict | null>(null)
   const [draft, setDraft] = useState<Record<string, string>>({})
+  const [escDraft, setEscDraft] = useState<Record<string, Escalation>>({})
+  const [sevSel, setSevSel] = useState<Record<string, Sev>>({})
+  const [noteIn, setNoteIn] = useState('')
   const [confirmEnd, setConfirmEnd] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
@@ -122,7 +126,7 @@ export function ShiftPage({ aiReady }: { aiReady: boolean }) {
 
   useEffect(() => { if (outRef.current) outRef.current.scrollTop = outRef.current.scrollHeight }, [tick])
 
-  const start = () => { setG(newGame(mode, def)); setVsel(null); setDraft({}); setSaved(false); setShowDebrief(true); setConfirmEnd(false); rerender() }
+  const start = () => { setG(newGame(mode, def)); setVsel(null); setDraft({}); setEscDraft({}); setSevSel({}); setNoteIn(''); setSaved(false); setShowDebrief(true); setConfirmEnd(false); rerender() }
 
   const run = (line: string) => {
     if (!g || !line.trim()) return
@@ -138,7 +142,13 @@ export function ShiftPage({ aiReady }: { aiReady: boolean }) {
     cmdRef.current?.focus()
   }
 
-  const pin = (id: string) => { if (!g) return; if (!togglePin(g, id)) setToast('Select an alert in the queue first, then pin evidence to it.'); rerender() }
+  const pin = (id: string) => {
+    if (!g) return
+    if (!g.sel) setToast('Select a ticket in the queue first, then pin evidence to it.')
+    else if (!g.tickets[g.sel]?.owner && !g.decided[g.sel]) setToast('Claim the ticket before pinning evidence to it.')
+    else togglePin(g, id)
+    rerender()
+  }
   const wait = (m: number) => { if (!g) return; advance(g, m); rerender() }
 
   const sel = g?.sel ? alertById(g, g.sel) ?? null : null
@@ -201,7 +211,7 @@ export function ShiftPage({ aiReady }: { aiReady: boolean }) {
 
   const submit = () => {
     if (!sel || !vsel) return
-    submitVerdict(g, sel.id, vsel, draft[sel.id] ?? '')
+    submitVerdict(g, sel.id, vsel, draft[sel.id] ?? '', { sev: sevSel[sel.id] ?? sel.sev, esc: escDraft[sel.id] })
     setVsel(null)
     rerender()
   }
@@ -231,8 +241,8 @@ export function ShiftPage({ aiReady }: { aiReady: boolean }) {
             return (
               <button type="button" key={a.id} className={`sh-q sh-sev-${a.sev} ${g.sel === a.id ? 'sh-q-on' : ''} ${d ? 'sh-q-done' : ''}`} onClick={() => { g.sel = a.id; setVsel(null); rerender() }}>
                 <span className="sh-q-t">{a.title}</span>
-                <span className="sh-q-m"><span>{a.id} · {a.ent}</span><span className={left < 0 && !d ? 'red' : ''}>{d ? 'decided' : left < 0 ? 'SLA breached' : `${left} min left`}</span></span>
-                <span className="sh-q-m"><span className={`sh-tag sh-tag-${a.sev}`}>{a.sev === 'high' ? 'HIGH' : a.sev === 'med' ? 'MEDIUM' : 'LOW'}</span><span>{hmShort(a.at)} · {a.src}</span></span>
+                <span className="sh-q-m"><span>{g.tickets[a.id]?.num} · {a.ent}</span><span className={left < 0 && !d ? 'red' : ''}>{d ? ticketStatus(g, a.id) : left < 0 ? 'SLA breached' : `${left} min left`}</span></span>
+                <span className="sh-q-m"><span className={`sh-tag sh-tag-${a.sev}`}>{a.sev === 'high' ? 'HIGH' : a.sev === 'med' ? 'MEDIUM' : 'LOW'}</span><span>{ticketStatus(g, a.id) === 'New' ? <b className={ackLeft(g, a) < 0 ? 'red' : ''}>{ackLeft(g, a) < 0 ? 'UNCLAIMED, ack late' : `NEW · claim in ${ackLeft(g, a)} min`}</b> : ticketStatus(g, a.id) === 'In progress' ? 'MINE' : `${hmShort(a.at)} · ${a.src}`}</span></span>
               </button>
             )
           })}
@@ -242,7 +252,13 @@ export function ShiftPage({ aiReady }: { aiReady: boolean }) {
           {sel ? (
             <div className="sh-alert">
               <h2 className="h2" style={{ fontSize: 16 }}>{sel.title}</h2>
-              <div className="mono tiny muted">{sel.id} · {sel.src} · {sel.ent} · arrived {hmShort(sel.at)}</div>
+              <div className="mono tiny muted">{g.tickets[sel.id]?.num} · {sel.id} · {sel.src} · {sel.ent} · arrived {hmShort(sel.at)} · {ticketStatus(g, sel.id).toUpperCase()}</div>
+              {ticketStatus(g, sel.id) === 'New' && (
+                <div className="sh-claim">
+                  <button type="button" className="btn btn-primary" disabled={g.over} onClick={() => run(`claim ${sel.id}`)}>Claim ticket {g.tickets[sel.id]?.num}</button>
+                  <span className="tiny muted">Claim it to work it: pinning evidence, work notes and a decision all need an owner. Takes 1 min. You can hold {WIP_MAX} at once ({inProgress(g).length} now).</span>
+                </div>
+              )}
               <pre className="sh-raw">{rawLines.join('\n') || '(no raw event available)'}</pre>
               <p className="small muted"><b>What the rule saw.</b> {sel.rule}</p>
               <div className="sh-kv">{sel.kv.map((k) => <div key={k[0]} style={{ display: 'contents' }}><span className="muted">{k[0]}</span><span>{k[1]}</span></div>)}</div>
@@ -288,23 +304,48 @@ export function ShiftPage({ aiReady }: { aiReady: boolean }) {
               <div className="sh-card">
                 {pins.length ? pins.map((e) => <button type="button" key={e.id} className="sh-pinrow" onClick={() => pin(e.id)} title="Click to unpin">{rawTextOf(g.def.dates, e)}</button>) : <div className="small muted">Click log lines in the console to pin them here. Closing an alert with no evidence is penalised.</div>}
               </div>
+              <TicketCard g={g} a={sel} noteIn={noteIn} setNoteIn={setNoteIn} onNote={() => { const r = addNote(g, sel.id, noteIn); if (r.ok) setNoteIn(''); else setToast(r.msg); rerender() }} />
               <div className="sh-card">
-                <div className="sh-h2">DECISION</div>
+                <div className="sh-h2">DISPOSITION</div>
                 {decided ? (
                   <>
-                    <div><span className="sh-tag sh-tag-ok">RECORDED</span> {VLABEL[decided.v]}</div>
+                    <div><span className="sh-tag sh-tag-ok">{ticketStatus(g, sel.id).toUpperCase()}</span> {VLABEL[decided.v]}</div>
                     {g.mode === 'training' && <p className="small muted" style={{ marginTop: 8 }}><b>Best: {VLABEL[sel.best]}.</b> {sel.why}</p>}
                     {g.mode === 'training' && <div style={{ marginTop: 8 }}><FeedbackBox facts={noteFacts(g, sel)} note={decided.note} aiReady={aiReady} /></div>}
                   </>
+                ) : !g.tickets[sel.id]?.owner ? (
+                  <div className="small muted">Claim this ticket to assess severity and choose a disposition.</div>
                 ) : (
                   <>
-                    <div className="sh-vopts" role="radiogroup" aria-label="Verdict">
+                    <div className="tiny muted mono" style={{ marginBottom: 4 }}>YOUR SEVERITY (rule said {sel.sev})</div>
+                    <div className="sh-vopts" role="radiogroup" aria-label="Severity">
+                      {(['low', 'med', 'high'] as Sev[]).map((x) => (
+                        <button type="button" key={x} role="radio" aria-checked={(sevSel[sel.id] ?? sel.sev) === x} className={`sh-vopt ${(sevSel[sel.id] ?? sel.sev) === x ? 'sh-vopt-on' : ''}`} onClick={() => setSevSel((d) => ({ ...d, [sel.id]: x }))}>{x === 'med' ? 'Medium' : x[0].toUpperCase() + x.slice(1)}</button>
+                      ))}
+                    </div>
+                    <div className="tiny muted mono" style={{ margin: '8px 0 4px' }}>DISPOSITION</div>
+                    <div className="sh-vopts" role="radiogroup" aria-label="Disposition">
                       {VERDICTS.map((v) => (
                         <button type="button" key={v[0]} role="radio" aria-checked={vsel === v[0]} className={`sh-vopt ${vsel === v[0] ? 'sh-vopt-on' : ''}`} onClick={() => setVsel(v[0])}>{v[1]}</button>
                       ))}
                     </div>
-                    <textarea className="sh-note" aria-label="Handover note" placeholder="Handover note: what happened, what you found, what should happen next" value={draft[sel.id] ?? ''} onChange={(e) => setDraft((d) => ({ ...d, [sel.id]: e.target.value }))} />
-                    <button type="button" className="btn btn-primary" style={{ marginTop: 8, width: '100%' }} disabled={!vsel || g.over} onClick={submit}>Submit decision</button>
+                    {vsel === 'incident' || vsel === 'insider' ? (
+                      <div className="sh-esc">
+                        <div className="tiny muted mono">ESCALATION HANDOVER · to {vsel === 'insider' ? 'HR and insider risk' : 'the IR lead'}</div>
+                        {ESC_FIELDS.map(([k, label, hint]) => (
+                          <label key={k} className="small">
+                            <b>{label}</b>
+                            <textarea className="sh-note" aria-label={label} placeholder={hint} value={escDraft[sel.id]?.[k] ?? ''} onChange={(e) => setEscDraft((d) => ({ ...d, [sel.id]: { ...({ summary: '', who: '', when: '', actions: '' } as Escalation), ...d[sel.id], [k]: e.target.value } }))} />
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      <textarea className="sh-note" aria-label="Closure comment" placeholder="Closure comment: why this is not an incident, and what you checked" value={draft[sel.id] ?? ''} onChange={(e) => setDraft((d) => ({ ...d, [sel.id]: e.target.value }))} />
+                    )}
+                    <button type="button" className="btn btn-primary" style={{ marginTop: 8, width: '100%' }} disabled={!vsel || g.over || ((vsel === 'incident' || vsel === 'insider') && ESC_FIELDS.some(([k]) => !(escDraft[sel.id]?.[k] ?? '').trim()))} onClick={submit}>
+                      {vsel === 'incident' || vsel === 'insider' ? 'Escalate ticket' : vsel === 'it' ? 'Transfer ticket' : 'Close ticket'}
+                    </button>
+                    {(vsel === 'incident' || vsel === 'insider') && <div className="tiny muted" style={{ marginTop: 4 }}>All four handover fields are required to escalate.</div>}
                   </>
                 )}
               </div>
@@ -331,12 +372,45 @@ export function ShiftPage({ aiReady }: { aiReady: boolean }) {
   )
 }
 
+function TicketCard({ g, a, noteIn, setNoteIn, onNote }: { g: Game; a: Alert; noteIn: string; setNoteIn: (v: string) => void; onNote: () => void }) {
+  const t = g.tickets[a.id]
+  if (!t) return null
+  const st = ticketStatus(g, a.id)
+  return (
+    <div className="sh-card">
+      <div className="sh-h2">TICKET {t.num}</div>
+      <div className="small"><span className="muted">Status</span> {st} · <span className="muted">Owner</span> {t.owner ?? 'unassigned'} · <span className="muted">Rule severity</span> {a.sev}</div>
+      <div className="tiny muted">Acknowledge within {ACK_MIN[a.sev]} min of arrival · resolve by {hmShort(a.at + a.sla)}</div>
+      {t.owner && !g.decided[a.id] && (
+        <div className="sh-notein">
+          <input className="sh-cmd" style={{ width: '100%' }} aria-label="Work note" placeholder="Work note (what you checked or found), Enter to add" value={noteIn} onChange={(e) => setNoteIn(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') onNote() }} />
+        </div>
+      )}
+      {t.notes.length > 0 && <div className="sh-notes">{t.notes.map((n, i) => <div className="small" key={i}><b className="mono">{hmShort(n.t)}</b> {n.text}</div>)}</div>}
+      <details className="tiny muted"><summary>Activity</summary>{t.trail.map((x, i) => <div key={i}><b className="mono">{hmShort(x.t)}</b> {x.m}</div>)}</details>
+    </div>
+  )
+}
+
 function scenarioLines(g: Game, a: Alert): string[] {
   const lines = scn(g).events.filter((e) => e.tag === a.raw && visible(g, e))
   const text = (e: Ev) => rawTextOf(g.def.dates, e)
   const out = lines.length > 4 ? [...lines.slice(0, 3).map(text), `   ... ${lines.length - 4} more events, same pattern ...`, text(lines[lines.length - 1])] : lines.map(text)
   if (a.rawNote) out.push(a.rawNote)
   return out
+}
+
+function ticketLine(g: Game, a: Alert): string {
+  const t = g.tickets[a.id]
+  if (!t) return ''
+  const tg = gradeTicket(g, a)
+  const parts = [`${t.num}: ${ticketStatus(g, a.id).toLowerCase()}`]
+  parts.push(t.claimedAt === undefined ? 'never claimed' : `claimed ${Math.round((t.claimedAt - a.at) / 60)} min after arrival (target ${ACK_MIN[a.sev]})`)
+  if (t.sev) parts.push(`you rated it ${t.sev}, real severity ${trueSev(a)}`)
+  if (t.esc) parts.push(`handover ${tg.escOk}/4 fields complete`)
+  parts.push(`${t.notes.length} work note${t.notes.length === 1 ? '' : 's'}`)
+  parts.push(`ticket points ${tg.pts >= 0 ? '+' : ''}${tg.pts}`)
+  return parts.join(' · ')
 }
 
 function Debrief({ g, aiReady, onClose, onAgain }: { g: Game; aiReady: boolean; onClose: () => void; onAgain: () => void }) {
@@ -385,7 +459,7 @@ function Debrief({ g, aiReady, onClose, onAgain }: { g: Game; aiReady: boolean; 
                     <td>{VLABEL[a.best]}</td>
                     <td className="small">{a.req.map((r) => <div key={r}><span className={reqMet(g, r) ? 'accent' : 'red'}>{reqMet(g, r) ? '✓' : '✗'}</span> {g.def.evd[r]}</div>)}</td>
                     <td className={`mono ${gr.pts >= 0 ? 'accent' : 'red'}`}>{gr.pts > 0 ? '+' : ''}{gr.pts}</td>
-                    <td className="small">{a.why}{gr.notes.length ? <><br /><b>{gr.notes.join(', ')}</b></> : null}</td>
+                    <td className="small">{a.why}{gr.notes.length ? <><br /><b>{gr.notes.join(', ')}</b></> : null}<br /><span className="muted">{ticketLine(g, a)}</span></td>
                   </tr>
                 )
               })}
