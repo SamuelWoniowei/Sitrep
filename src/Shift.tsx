@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, errText, type NoteFeedback, type ShiftResult } from './api'
 import type { Alert, Ev, ShiftDef, Verdict } from './shift/types'
-import { LEVELS, SHIFTS } from './shift'
+import { LEVELS, SHIFTS } from './shift/index'
 import {
   VERDICTS, VLABEL, alertById, exec, advance, endShift, evById, gradeAlert, gradeContain, isPinned, maxScore, newGame, noteFacts,
   openAlerts, reqMet, scn, submitVerdict, timeline, togglePin, total, visible, type Block, type Game, type Item, type Mode,
