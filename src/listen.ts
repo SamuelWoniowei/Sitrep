@@ -41,14 +41,19 @@ export function briefScript(stories: Story[]): string[] {
 
 interface VoiceLike { name: string; lang: string; localService: boolean }
 
-/** Keep only voices that run on this device (never cloud/"Online" voices). */
+/** Novelty voices that ship with macOS. Never pick these to read a briefing. */
+const NOVELTY = /^(albert|bad news|bahh|bells|boing|bubbles|cellos|deranged|good news|hysterical|jester|organ|pipe organ|superstar|trinoids|whisper|wobble|zarvox|fred|junior|ralph|kathy|eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley)\b/i
+const LIKED = /^(daniel|serena|oliver|kate|arthur|martha|samantha|george|hazel|susan|ryan|libby)\b/i
+
+/** Keep only voices that run on this device (never cloud/"Online" voices), best first. */
 export function pickLocalVoice<T extends VoiceLike>(voices: T[]): T | null {
-  const local = voices.filter((v) => v.localService && !/online|natural|cloud/i.test(v.name))
-  return (
-    local.find((v) => /^en[-_]GB/i.test(v.lang)) ??
-    local.find((v) => /^en/i.test(v.lang)) ??
-    null
-  )
+  const local = voices.filter((v) => v.localService && !/online|natural|cloud/i.test(v.name) && !NOVELTY.test(v.name))
+  const score = (v: T) =>
+    (/premium/i.test(v.name) ? 30 : /enhanced/i.test(v.name) ? 20 : 0) +
+    (/^en[-_]GB/i.test(v.lang) ? 10 : /^en/i.test(v.lang) ? 5 : -100) +
+    (LIKED.test(v.name) ? 3 : 0)
+  const best = [...local].sort((a, b) => score(b) - score(a))[0]
+  return best && score(best) > 0 ? best : null
 }
 
 let ctx: AudioContext | null = null

@@ -323,11 +323,11 @@ export function AffectedPage() {
       <div className="dash">
       <div className="card">
       <h2 className="mono h2 spaced">SCAN</h2>
-      <p className="small muted">Looks at the list of programs installed on this PC and compares their names with flaws attackers have recently started exploiting (CISA's list, last 90 days). It only reads names, keeps nothing, and sends nothing anywhere. It cannot check version numbers, so a match means "worth checking you are fully updated".</p>
-      <button type="button" className="btn btn-primary" disabled={busy} onClick={check}>{busy ? 'Checking…' : 'Check this PC'}</button>
+      <p className="small muted">Looks at the list of programs installed on this computer and compares their names with flaws attackers have recently started exploiting (CISA's list, last 90 days). It only reads names, keeps nothing, and sends nothing anywhere. It cannot check version numbers, so a match means "worth checking you are fully updated".</p>
+      <button type="button" className="btn btn-primary" disabled={busy} onClick={check}>{busy ? 'Checking…' : 'Check this computer'}</button>
       {busy && <div className="scanbar" role="status" aria-label="Scanning installed programs"><span /></div>}
       {e2 && <div className="error small">{e2}</div>}
-      {exp && !exp.supported && <p className="small muted">This check only works on Windows.</p>}
+      {exp && !exp.supported && <p className="small muted">This check works on Windows and Mac only.</p>}
       {exp && exp.supported && (
         <>
           <p className="small">{exp.programs} programs checked. {exp.matches.length === 0 ? 'Nothing matched.' : `${exp.matches.length} worth a look:`}</p>
@@ -570,9 +570,20 @@ function VoiceSection() {
           <p className="small">
             {v.installed
               ? <>Natural voice: <span className="accent">{v.voice}</span>, running on this computer.</>
-              : <>Natural voice not installed. Listen mode will use a built-in Windows voice that runs on this device (never an "Online" one).</>}
+              : v.downloadable
+                ? <>Natural voice not installed. Listen mode will use a built-in Windows voice that runs on this device (never an "Online" one).</>
+                : <>Listen mode uses the voices built into macOS, which run on this Mac (never an online one).</>}
           </p>
-          {!v.installed ? (
+          {!v.installed && !v.downloadable ? (
+            <>
+              <button type="button" className="btn btn-primary" disabled={testing} onClick={test}>
+                {testing ? 'Speaking…' : '▶ Test voice'}
+              </button>
+              <p className="tiny muted">
+                For a more natural sound: System Settings → Accessibility → Spoken Content → System voice → Manage voices, then download a British voice marked Enhanced or Premium (for example Daniel or Serena). Sitrep picks it up automatically.
+              </p>
+            </>
+          ) : !v.installed ? (
             <>
               <button type="button" className="btn btn-primary" disabled={busy} onClick={() => run(api.voiceInstall)}>
                 {busy ? 'Downloading and checking…' : `Download natural voice (~${v.size_mb} MB, one time)`}

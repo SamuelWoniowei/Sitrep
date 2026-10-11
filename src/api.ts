@@ -154,7 +154,7 @@ export interface Recap {
 export interface BuiltItem { week: string; title: string; theme: string; completed_at: number }
 export interface AiStatus { running: boolean; enabled: boolean; models: string[]; model: string; full_articles: boolean }
 export interface UpdateInfo { current: string; available: string | null; notes: string | null }
-export interface VoiceStatus { installed: boolean; voice: string; size_mb: number; sample_rate: number }
+export interface VoiceStatus { installed: boolean; downloadable: boolean; voice: string; size_mb: number; sample_rate: number }
 export interface RefreshResult { new_stories: number; failed: string[]; skipped: boolean }
 
 export const api = {

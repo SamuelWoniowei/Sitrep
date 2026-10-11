@@ -590,8 +590,34 @@ pub fn exposure(programs: &[String], kev: &[KevRow]) -> Vec<Exposure> {
     v
 }
 
-/// Read-only list of installed program names (Windows registry). Elsewhere
-/// it returns nothing. Nothing is stored or sent anywhere.
+/// Names of installed Mac apps and Homebrew packages, from plain folder
+/// listings (no commands run). `.app` is dropped from app names.
+pub fn mac_program_names(dirs: &[std::path::PathBuf]) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for d in dirs {
+        let Ok(rd) = std::fs::read_dir(d) else {
+            continue;
+        };
+        for e in rd.flatten().take(2000) {
+            let name = e.file_name().to_string_lossy().into_owned();
+            let n = match name.strip_suffix(".app") {
+                Some(n) => n.to_string(),
+                None if d.ends_with("Cellar") || d.ends_with("Caskroom") => name,
+                None => continue,
+            };
+            if !n.is_empty() && !n.starts_with('.') && n.chars().count() <= 120 {
+                out.push(n);
+            }
+        }
+    }
+    out.sort();
+    out.dedup();
+    out
+}
+
+/// Read-only list of installed program names: the Windows registry, or the
+/// app folders on a Mac. Elsewhere it returns nothing. Nothing is stored or
+/// sent anywhere.
 pub async fn installed_programs() -> Vec<String> {
     #[cfg(windows)]
     {
@@ -616,7 +642,22 @@ pub async fn installed_programs() -> Vec<String> {
         }
         parse_reg_output(&all)
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
+    {
+        let mut dirs: Vec<std::path::PathBuf> = vec![
+            "/Applications".into(),
+            "/Applications/Utilities".into(),
+            "/opt/homebrew/Cellar".into(),
+            "/usr/local/Cellar".into(),
+            "/opt/homebrew/Caskroom".into(),
+            "/usr/local/Caskroom".into(),
+        ];
+        if let Some(h) = std::env::var_os("HOME") {
+            dirs.push(std::path::Path::new(&h).join("Applications"));
+        }
+        mac_program_names(&dirs)
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
     {
         Vec::new()
     }
@@ -1128,5 +1169,25 @@ mod tests {
                 "Fortinet VPN flaw exploited by ransomware crews"
             ]
         );
+    }
+
+    #[test]
+    fn lists_mac_apps_and_packages_from_folders() {
+        let base = std::env::temp_dir().join(format!("sitrep-mac-{}", std::process::id()));
+        let apps = base.join("Applications");
+        let cellar = base.join("Cellar");
+        std::fs::create_dir_all(apps.join("Google Chrome.app")).unwrap();
+        std::fs::create_dir_all(apps.join("Zoom.app")).unwrap();
+        std::fs::create_dir_all(apps.join(".hidden.app")).unwrap();
+        std::fs::write(apps.join("readme.txt"), "x").unwrap();
+        std::fs::create_dir_all(cellar.join("openssl@3")).unwrap();
+        let got = mac_program_names(&[apps.clone(), cellar.clone(), base.join("missing")]);
+        assert_eq!(got, vec!["Google Chrome", "Zoom", "openssl@3"]);
+        // an app list feeds the same matcher the Windows list does
+        assert!(
+            program_matches("Google Chrome", "Google", "Chromium V8")
+                || program_matches("Zoom", "Zoom", "Zoom Client")
+        );
+        let _ = std::fs::remove_dir_all(&base);
     }
 }

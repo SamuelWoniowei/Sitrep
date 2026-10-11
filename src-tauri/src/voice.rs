@@ -420,6 +420,7 @@ pub async fn synth_file(
 #[derive(Serialize)]
 pub struct VoiceStatus {
     pub installed: bool,
+    pub downloadable: bool,
     pub voice: &'static str,
     pub size_mb: u32,
     pub sample_rate: u32,
@@ -434,6 +435,7 @@ pub fn voice_status(app: AppHandle) -> Result<VoiceStatus, String> {
     let p = paths(&app_dir(&app)?);
     Ok(VoiceStatus {
         installed: is_installed(&p),
+        downloadable: cfg!(windows),
         voice: "Alan (British, male)",
         size_mb: 85,
         sample_rate: SAMPLE_RATE,
@@ -442,6 +444,9 @@ pub fn voice_status(app: AppHandle) -> Result<VoiceStatus, String> {
 
 #[tauri::command]
 pub async fn voice_install(app: AppHandle) -> Result<VoiceStatus, String> {
+    if !cfg!(windows) {
+        return Err("The downloadable voice is Windows only. On a Mac, Sitrep uses the voices built into macOS.".into());
+    }
     let dir = app_dir(&app)?;
     let client = download_client().map_err(|e| e.to_string())?;
     let zip = download_pinned(&client, PIPER_URL, PIPER_MAX_BYTES, PIPER_SHA256).await?;

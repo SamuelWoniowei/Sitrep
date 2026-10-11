@@ -25,6 +25,14 @@ describe('listen mode', () => {
     expect(pickLocalVoice(voices.slice(3))?.name).toBe('Microsoft David')
   })
 
+  it('prefers a premium British Mac voice and skips novelty voices', () => {
+    const v = (name: string, lang = 'en-GB') => ({ name, lang, localService: true })
+    const voices = [v('Zarvox', 'en-US'), v('Eddy'), v('Samantha', 'en-US'), v('Daniel'), v('Serena (Premium)'), v('Daniel (Enhanced)')]
+    expect(pickLocalVoice(voices)?.name).toBe('Serena (Premium)')
+    expect(pickLocalVoice(voices.slice(0, 4))?.name).toBe('Daniel')
+    expect(pickLocalVoice([v('Zarvox', 'en-US'), v('Amelie', 'fr-FR')])).toBeNull()
+  })
+
   it('converts 16-bit PCM to floats', () => {
     const b = new ArrayBuffer(6)
     const v = new DataView(b)

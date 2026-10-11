@@ -154,6 +154,12 @@ News comes from BleepingComputer, The Record, The Hacker News, the UK NCSC, the 
 - Stories that led an earlier day's brief no longer lead today's brief unless nothing fresher exists.
 - **More news**: Today now lists the 15 newest stories that aren't in the brief, newest first. They open the original article in your browser.
 
+## Unreleased (next version)
+
+- Rail grouped into 8 sections with tabs (Train, Portfolio, Weekly; Systems under Settings).
+- "Am I affected?" now works on a Mac: it reads app names from /Applications and Homebrew folders (no commands run, nothing stored or sent).
+- Mac voice: Listen mode picks the best on-device macOS voice (premium/enhanced British first, novelty voices skipped). The downloadable Piper voice stays Windows only, because Piper's macOS release for this version is unusable (its "aarch64" binary is x86_64 and the libraries it needs are missing from the archive).
+
 ## v0.5.0
 
 - **SOC shift** (new page): a training simulator. You are the only analyst on a morning shift at a fictional company, from 08:30 to 11:00. Eight alerts arrive over time, some real and some routine. You investigate by typing SIEM-style searches across mail, proxy, Entra ID, Exchange, EDR, VPN and Active Directory logs (about 2,500 simulated events), look up indicators, phone people, pin evidence, decide, and contain with typed commands. A debrief shows what really happened (mapped to MITRE ATT&CK), what you found and missed, and which controls would have stopped it. Training mode gives hints and live feedback; exam mode gives neither until the end. Your best score is saved on this PC. Everything is simulated: invented names, domains and documentation-range IPs.
