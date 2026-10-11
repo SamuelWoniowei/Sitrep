@@ -44,6 +44,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::refresh,
             commands::get_today,
+            commands::get_more,
             commands::mark_read,
             commands::open_story,
             commands::ai_status,

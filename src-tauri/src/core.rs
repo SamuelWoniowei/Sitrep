@@ -79,6 +79,8 @@ pub fn score(store: &Store, s: &StoryRow, watch: &[String], now: i64) -> f64 {
 /// story included when one is available.
 pub fn select_brief(store: &Store, now: i64) -> Vec<String> {
     let watch = store.watchlist().unwrap_or_default();
+    // Stories that led an earlier day's brief only come back if nothing fresher is available.
+    let seen = store.past_brief_ids(&day_key(now));
     let mut cands = Vec::new();
     for window in [48, 96, 168] {
         cands = store.stories_since(now - window * HOUR).unwrap_or_default();
@@ -88,7 +90,14 @@ pub fn select_brief(store: &Store, now: i64) -> Vec<String> {
     }
     let mut scored: Vec<(f64, Category, StoryRow)> = cands
         .into_iter()
-        .map(|s| (score(store, &s, &watch, now), category_of(store, &s), s))
+        .map(|s| {
+            let stale = if seen.contains(&s.id) { 1000.0 } else { 0.0 };
+            (
+                score(store, &s, &watch, now) - stale,
+                category_of(store, &s),
+                s,
+            )
+        })
         .collect();
     scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
 
@@ -677,6 +686,39 @@ mod tests {
     }
 
     #[test]
+    fn yesterdays_brief_stories_do_not_lead_today() {
+        let s = seeded();
+        let first = select_brief(&s, NOW);
+        // Pretend these three led yesterday's brief.
+        s.set_brief(&day_key(NOW - 86_400), &first).unwrap();
+        let today = select_brief(&s, NOW);
+        assert_eq!(today.len(), 3);
+        assert!(
+            today.iter().filter(|i| first.contains(i)).count() < 3,
+            "fresh stories must lead when they exist"
+        );
+        // The fourth story is not in yesterday's brief, so it must be picked.
+        let fourth: Vec<_> = s
+            .stories_since(0)
+            .unwrap()
+            .into_iter()
+            .filter(|x| !first.contains(&x.id))
+            .map(|x| x.id)
+            .collect();
+        assert!(fourth.iter().all(|id| today.contains(id)));
+    }
+
+    #[test]
+    fn more_news_skips_todays_brief() {
+        let s = seeded();
+        let ids = ensure_brief(&s, NOW);
+        let more = more_stories(&s, NOW, 15);
+        assert!(more.iter().all(|m| !ids.contains(&m.id)));
+        let all = s.stories_since(NOW - 72 * HOUR).unwrap().len();
+        assert_eq!(more.len(), all - ids.len());
+    }
+
+    #[test]
     fn watchlist_boosts() {
         let s = seeded();
         s.add_watch("dashboard").unwrap();
@@ -799,4 +841,40 @@ mod tests {
         }
         assert_eq!(radar(&s, NOW).len(), ALL_THEMES.len());
     }
+}
+
+// ---------------- more news ----------------
+
+#[derive(Serialize, Clone, Debug)]
+pub struct MoreItem {
+    pub id: String,
+    pub title: String,
+    pub sources: Vec<String>,
+    pub published: i64,
+    pub category_label: &'static str,
+    pub has_link: bool,
+}
+
+/// The newest stories that are not in today's brief, freshest first.
+pub fn more_stories(store: &Store, now: i64, limit: usize) -> Vec<MoreItem> {
+    let brief: std::collections::HashSet<String> = store
+        .brief_ids(&day_key(now))
+        .unwrap_or_default()
+        .into_iter()
+        .collect();
+    store
+        .stories_since(now - 72 * HOUR)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|s| !brief.contains(&s.id))
+        .take(limit)
+        .map(|s| MoreItem {
+            category_label: category_of(store, &s).label(),
+            has_link: s.link.is_some(),
+            id: s.id,
+            title: crate::text::to_plain(&s.title, 200),
+            sources: s.sources,
+            published: s.published,
+        })
+        .collect()
 }

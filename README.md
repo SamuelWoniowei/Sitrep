@@ -148,3 +148,8 @@ News comes from BleepingComputer, The Record, The Hacker News, the UK NCSC, the 
 
 - **Listen** now speaks a plain-English summary of each story (what happened, in simple words, and what to do) instead of reading the card text. It uses the AI's plain-words explanation when available and the short summary otherwise.
 - **Fun facts**: "Make more with AI" asks your local Ollama for extra facts. They are saved on this PC (up to 60), labelled as AI-written, and never used as the fact of the day.
+
+## v0.4.4 additions
+
+- Stories that led an earlier day's brief no longer lead today's brief unless nothing fresher exists.
+- **More news**: Today now lists the 15 newest stories that aren't in the brief, newest first. They open the original article in your browser.

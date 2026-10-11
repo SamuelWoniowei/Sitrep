@@ -1031,3 +1031,9 @@ pub async fn make_facts(state: State<'_, AppState>) -> Res<Vec<ai::AiFact>> {
     .map_err(|e| e.to_string())?;
     Ok(all)
 }
+
+#[tauri::command]
+pub fn get_more(state: State<'_, AppState>) -> Res<Vec<core::MoreItem>> {
+    let s = lock(&state)?;
+    Ok(core::more_stories(&s, now(), 15))
+}
