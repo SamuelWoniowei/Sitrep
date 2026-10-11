@@ -11,25 +11,21 @@ import { briefScript, playParts, stopSpeaking, unlockAudio } from './listen'
 
 export type Page = 'today' | 'project' | 'backlog' | 'built' | 'recap' | 'radar' | 'glossary' | 'developing' | 'actors' | 'affected' | 'labpack' | 'hunt' | 'systems' | 'liveops' | 'shift' | 'watchlist' | 'settings'
 
-const NAV: { id: Page; label: string; group?: 'top' | 'mid' | 'learn' | 'bottom' }[] = [
-  { id: 'today', label: 'TODAY', group: 'top' },
-  { id: 'liveops', label: 'LIVE OPS', group: 'top' },
-  { id: 'project', label: 'PROJECT OF WEEK', group: 'top' },
-  { id: 'backlog', label: 'BACKLOG', group: 'top' },
-  { id: 'built', label: 'BUILT', group: 'top' },
-  { id: 'developing', label: 'DEVELOPING', group: 'mid' },
-  { id: 'actors', label: 'THREAT ACTORS', group: 'mid' },
-  { id: 'affected', label: 'AM I AFFECTED?', group: 'mid' },
-  { id: 'labpack', label: 'LAB PACK', group: 'mid' },
-  { id: 'hunt', label: 'LOG HUNT', group: 'mid' },
-  { id: 'shift', label: 'SOC SHIFT', group: 'mid' },
-  { id: 'recap', label: 'SUNDAY SITREP', group: 'learn' },
-  { id: 'radar', label: 'SKILLS RADAR', group: 'learn' },
-  { id: 'glossary', label: 'GLOSSARY', group: 'learn' },
-  { id: 'watchlist', label: 'WATCHLIST', group: 'bottom' },
-  { id: 'systems', label: 'SYSTEMS', group: 'bottom' },
-  { id: 'settings', label: 'SETTINGS', group: 'bottom' },
+interface Section { id: string; label: string; group: 'top' | 'mid' | 'learn' | 'bottom'; tabs: { id: Page; label: string }[] }
+
+// Related pages sit together under one rail item and switch with tabs.
+const SECTIONS: Section[] = [
+  { id: 'today', label: 'TODAY', group: 'top', tabs: [{ id: 'today', label: 'Brief' }, { id: 'developing', label: 'Developing' }, { id: 'actors', label: 'Threat actors' }, { id: 'affected', label: 'Am I affected?' }] },
+  { id: 'liveops', label: 'LIVE OPS', group: 'top', tabs: [{ id: 'liveops', label: 'Live ops' }] },
+  { id: 'train', label: 'TRAIN', group: 'mid', tabs: [{ id: 'shift', label: 'SOC shift' }, { id: 'hunt', label: 'Log hunt' }, { id: 'labpack', label: 'Lab pack' }] },
+  { id: 'portfolio', label: 'PORTFOLIO', group: 'mid', tabs: [{ id: 'project', label: 'Project of the week' }, { id: 'backlog', label: 'Backlog' }, { id: 'built', label: 'Built' }] },
+  { id: 'weekly', label: 'WEEKLY', group: 'learn', tabs: [{ id: 'recap', label: 'Sunday sitrep' }, { id: 'radar', label: 'Skills radar' }] },
+  { id: 'glossary', label: 'GLOSSARY', group: 'learn', tabs: [{ id: 'glossary', label: 'Glossary' }] },
+  { id: 'watchlist', label: 'WATCHLIST', group: 'bottom', tabs: [{ id: 'watchlist', label: 'Watchlist' }] },
+  { id: 'settings', label: 'SETTINGS', group: 'bottom', tabs: [{ id: 'settings', label: 'Settings' }, { id: 'systems', label: 'Systems' }] },
 ]
+
+const sectionOf = (p: Page): Section => SECTIONS.find((x) => x.tabs.some((t) => t.id === p)) ?? SECTIONS[0]
 
 function syncText(ts: number): string {
   if (!ts) return 'NOT SYNCED YET'
@@ -48,6 +44,9 @@ export default function App() {
   const [speaking, setSpeaking] = useState(false)
   const [sourceCount, setSourceCount] = useState(0)
   const enhancing = useRef(false)
+  const last = useRef<Record<string, Page>>({})
+  const section = sectionOf(page)
+  useEffect(() => { last.current[sectionOf(page).id] = page }, [page])
 
   const reload = useCallback(async () => {
     try {
@@ -156,17 +155,16 @@ export default function App() {
 
       <div className="body">
         <nav className="rail mono" aria-label="Main">
-          {NAV.map((n, i) => (
+          {SECTIONS.map((n, i) => (
             <div key={n.id} className="rail-item-wrap">
-              {i > 0 && NAV[i - 1].group !== n.group && <div className={n.group === 'bottom' ? 'rail-push' : 'rail-sep'} />}
+              {i > 0 && SECTIONS[i - 1].group !== n.group && <div className={n.group === 'bottom' ? 'rail-push' : 'rail-sep'} />}
               <button
                 type="button"
-                className={`rail-item ${page === n.id ? 'rail-on' : ''}`}
-                aria-current={page === n.id ? 'page' : undefined}
-                onClick={() => setPage(n.id)}
+                className={`rail-item ${section.id === n.id ? 'rail-on' : ''}`}
+                aria-current={section.id === n.id ? 'page' : undefined}
+                onClick={() => setPage(last.current[n.id] ?? n.tabs[0].id)}
               >
                 {n.label}
-                {n.id === 'backlog' && today && <span className="muted">{today.idea_count}/{today.idea_cap}</span>}
               </button>
             </div>
           ))}
@@ -174,6 +172,16 @@ export default function App() {
 
         <main className="main">
           {note && <div className="note" role="status">{note}</div>}
+          {section.tabs.length > 1 && (
+            <div className="subtabs mono" role="tablist" aria-label={section.label}>
+              {section.tabs.map((t) => (
+                <button key={t.id} type="button" role="tab" aria-selected={page === t.id} className={`subtab ${page === t.id ? 'subtab-on' : ''}`} onClick={() => setPage(t.id)}>
+                  {t.label}
+                  {t.id === 'backlog' && today && <span className="muted"> {today.idea_count}/{today.idea_cap}</span>}
+                </button>
+              ))}
+            </div>
+          )}
           {page === 'today' && (today ? <Today data={today} aiReady={aiReady} reload={reload} go={setPage} /> : <div className="muted">Loading…</div>)}
           {page === 'project' && <ProjectPage />}
           {page === 'backlog' && <BacklogPage />}
