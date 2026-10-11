@@ -1079,19 +1079,29 @@ pub fn save_shift_result(
     score: i32,
     max: i32,
 ) -> Res<ShiftResult> {
-    if !SHIFT_IDS.contains(&shift.as_str()) || !(-10_000..=10_000).contains(&score) || !(1..=10_000).contains(&max) {
+    if !SHIFT_IDS.contains(&shift.as_str())
+        || !(-10_000..=10_000).contains(&score)
+        || !(1..=10_000).contains(&max)
+    {
         return Err("Not a valid shift result.".into());
     }
     let s = lock(&state)?;
     let mut all = load_shift_results(&s);
     let r = all.entry(shift).or_default();
-    r.best = if r.plays == 0 { score } else { r.best.max(score) };
+    r.best = if r.plays == 0 {
+        score
+    } else {
+        r.best.max(score)
+    };
     r.max = max;
     r.plays = r.plays.saturating_add(1);
     r.last = now();
     let out = r.clone();
-    s.set_setting(SHIFT_KEY, &serde_json::to_string(&all).map_err(|e| e.to_string())?)
-        .map_err(|e| e.to_string())?;
+    s.set_setting(
+        SHIFT_KEY,
+        &serde_json::to_string(&all).map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| e.to_string())?;
     Ok(out)
 }
 
