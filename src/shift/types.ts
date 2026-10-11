@@ -31,6 +31,7 @@ export interface Alert {
   req: string[]
   why: string
   hints: string[]
+  tsev?: Sev // true severity once understood; defaults from the verdict (incident/insider high, it med, otherwise low)
   late?: string // only arrives if this trigger flag was set
 }
 export interface User { n: string; host: string; dept: string; dev: string; ip: string }

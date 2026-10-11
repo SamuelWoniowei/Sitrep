@@ -528,3 +528,8 @@ body::before { content: ''; position: fixed; inset: 0; z-index: 0; pointer-event
 .subtab { padding: 9px 14px; border: none; border-bottom: 2px solid transparent; background: transparent; color: #a9b4c2; letter-spacing: 0.06em; cursor: pointer; }
 .subtab:hover { color: var(--bright); }
 .subtab-on { color: var(--bright); border-bottom-color: var(--accent); }
+.sh-claim { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 8px 0 }
+.sh-esc { display: grid; gap: 6px; margin-top: 8px }
+.sh-esc label { display: grid; gap: 2px }
+.sh-notein { margin: 8px 0 }
+.sh-notes { display: grid; gap: 3px; margin: 6px 0 }

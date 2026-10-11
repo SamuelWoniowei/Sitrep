@@ -2,7 +2,7 @@
 // commands, the clock, and scoring. It is generic: everything scenario-specific
 // comes from the active ShiftDef (see types.ts). Pure TypeScript with no
 // network, storage or DOM access, so it is easy to test.
-import type { Alert, Ev, ShiftDef, Verdict, TimelineRow, Scenario } from './types'
+import type { Alert, Ev, Sev, ShiftDef, Verdict, TimelineRow, Scenario } from './types'
 import { hm } from './common'
 
 export type Mode = 'training' | 'exam'
@@ -11,6 +11,28 @@ export type Item =
   | { k: 'msg'; t: string; cls?: 'ok' | 'bad' | 'warn' }
   | { k: 'res'; t: string }
   | { k: 'rows'; vis: Ev[]; mode: 'raw' | 'table' | 'grid'; cols: string[]; grid?: { head: string[]; rows: (string | number)[][] } }
+// Ticket workflow: every alert is a ticket you must claim before you work it,
+// acknowledged within a window set by its severity. Escalations need a
+// written handover (what, who, when, actions) that is scored.
+export interface Escalation { summary: string; who: string; when: string; actions: string }
+export interface Ticket {
+  num: string
+  owner: string | null
+  claimedAt?: number
+  sev?: Sev // the severity you assessed
+  esc?: Escalation
+  notes: { t: number; text: string }[]
+  trail: { t: number; m: string }[]
+}
+export type TicketStatus = 'New' | 'In progress' | 'Escalated' | 'Transferred' | 'Closed'
+export const ACK_MIN: Record<Sev, number> = { high: 10, med: 20, low: 45 }
+export const WIP_MAX = 3
+export const ESC_FIELDS: [keyof Escalation, string, string][] = [
+  ['summary', 'What happened', 'One or two sentences: what the alert was and what you concluded.'],
+  ['who', 'Who and what is affected', 'Users, hosts, accounts, data or money involved.'],
+  ['when', 'When', 'First and last malicious activity, in UTC, and when you found it.'],
+  ['actions', 'Done and needed next', 'What you contained already, and what the receiving team must do.'],
+]
 export interface Block { cmd: string; cost: number; items: Item[]; meta?: string; skip?: boolean }
 export interface Game {
   def: ShiftDef
@@ -32,6 +54,7 @@ export interface Game {
   blocks: Block[]
   call: { persona: string; turns: ChatTurn[] } | null
   toasts: string[]
+  tickets: Record<string, Ticket>
 }
 export interface ExecResult { ask?: { persona: string; turns: ChatTurn[]; slot: Item & { k: 'res' } } }
 
@@ -41,13 +64,46 @@ export const alertById = (g: Game, id: string): Alert | undefined => g.def.alert
 export function newGame(mode: Mode, def: ShiftDef): Game {
   const g: Game = {
     def, mode, clock: def.start, sel: null, decided: {}, pins: {}, actions: new Set(), log: [], hist: [], cmdHist: [],
-    arrived: new Set(), flags: {}, flagDone: {}, hints: 0, hintUse: {}, over: false, blocks: [], call: null, toasts: [],
+    arrived: new Set(), flags: {}, flagDone: {}, hints: 0, hintUse: {}, over: false, blocks: [], call: null, toasts: [], tickets: {},
   }
-  for (const a of def.alerts) if (!a.late && a.at <= def.start) g.arrived.add(a.id)
+  for (const a of def.alerts) if (!a.late && a.at <= def.start) arrive(g, a)
   log(g, 'Shift started')
   return g
 }
 export function log(g: Game, m: string): void { g.log.unshift({ t: g.clock, m }) }
+function arrive(g: Game, a: Alert): void {
+  g.arrived.add(a.id)
+  const i = g.def.alerts.findIndex((x) => x.id === a.id)
+  g.tickets[a.id] = { num: `TKT-${4001 + i * 7}`, owner: null, notes: [], trail: [{ t: Math.max(a.at, g.def.start), m: 'Ticket created from alert, unassigned' }] }
+}
+export const trueSev = (a: Alert): Sev => a.tsev ?? (a.best === 'incident' || a.best === 'insider' ? 'high' : a.best === 'it' ? 'med' : 'low')
+export function ticketStatus(g: Game, id: string): TicketStatus {
+  const d = g.decided[id]
+  if (d) return d.v === 'incident' || d.v === 'insider' ? 'Escalated' : d.v === 'it' ? 'Transferred' : 'Closed'
+  return g.tickets[id]?.owner ? 'In progress' : 'New'
+}
+export const inProgress = (g: Game): Alert[] => g.def.alerts.filter((a) => g.arrived.has(a.id) && !g.decided[a.id] && g.tickets[a.id]?.owner)
+export function claimTicket(g: Game, id: string): { ok: boolean; msg: string } {
+  const a = alertById(g, id)
+  const t = g.tickets[id]
+  if (!a || !t || !g.arrived.has(id)) return { ok: false, msg: `No ticket for "${id}". Type "alerts" to list the queue.` }
+  if (g.decided[id]) return { ok: false, msg: `${t.num} is already ${ticketStatus(g, id).toLowerCase()}.` }
+  if (t.owner) return { ok: false, msg: `${t.num} is already yours.` }
+  if (inProgress(g).length >= WIP_MAX) return { ok: false, msg: `You already have ${WIP_MAX} tickets in progress. Close, escalate or transfer one before claiming another.` }
+  t.owner = 'you'
+  t.claimedAt = g.clock
+  t.trail.push({ t: g.clock, m: 'Claimed by you' })
+  log(g, `Claimed ${t.num} (${a.id})`)
+  return { ok: true, msg: `${t.num} claimed. ${a.title}. Acknowledge target was ${ACK_MIN[a.sev]} min from arrival.` }
+}
+export function addNote(g: Game, id: string | null, text: string): { ok: boolean; msg: string } {
+  const t = id ? g.tickets[id] : undefined
+  if (!id || !t) return { ok: false, msg: 'Select a ticket first.' }
+  if (!t.owner) return { ok: false, msg: `Claim ${t.num} before adding work notes.` }
+  if (!text.trim()) return { ok: false, msg: 'Usage: note <text>' }
+  t.notes.push({ t: g.clock, text: text.trim().slice(0, 500) })
+  return { ok: true, msg: `Work note added to ${t.num}.` }
+}
 export function visible(g: Game, e: Ev): boolean { return e.ts <= g.clock && (!e.cond || !!g.flags[e.cond]) }
 export function evById(g: Game, id: string): Ev | undefined { return scn(g).events.find((e) => e.id === id) }
 
@@ -188,7 +244,7 @@ export const COSTS: Record<string, number> = {
   ti: 1, whois: 1, b64: 0, phone: 5, badge: 3, hr: 3, 'ask-it': 3, ticket: 2, 'revoke-sessions': 2, 'reset-password': 2, 'disable-user': 2,
   'delete-rule': 2, 'revoke-consent': 2, 'block-domain': 2, 'block-ip': 2, 'purge-mail': 3, isolate: 2, 'remove-group': 2, 'notify-finance': 3,
   notify: 3, snapshot: 3, 'restrict-access': 2, 'disable-key': 2, 'delete-account': 2, terminate: 2, lock: 2, 'delete-file': 2, 'rotate-secret': 3,
-  hint: 0, help: 0, fields: 0, alerts: 0, clear: 0, hangup: 0,
+  hint: 0, help: 0, fields: 0, alerts: 0, tickets: 0, claim: 1, note: 0, helpdesk: 2, clear: 0, hangup: 0,
 }
 export function helpText(def: ShiftDef): string {
   return `SEARCH     source=entra user=jenna.hart result=success
@@ -198,8 +254,11 @@ PIPES      | sort -time | head 20 | tail 5 | table time,user,ip | dedup ip
            | stats count by ip | top domain
 SOURCES    ${Object.keys(def.fields).join(' · ')}
            fields <source>  lists the field names
+TICKETS    alerts (or tickets)   claim <alert id>   note <text>
+           Claim a ticket before you work it (max ${WIP_MAX} at once). Work notes go on the selected ticket.
 LOOKUPS    ti <ip|domain|hash>   whois <domain>   b64 <string>
-           phone <user>   badge <user>   hr <user>   ask-it <question>   ticket <id>
+           phone <user>   badge <user>   hr <user>   ask-it <question>
+           ticket <id>  (look up an IT helpdesk ticket; also "helpdesk <id>")
 ACTIONS    revoke-sessions <user> · reset-password <user> · disable-user <user>
            restrict-access <user> · delete-rule <user> · revoke-consent <user> <app>
            block-domain <domain> · block-ip <ip|cidr> · purge-mail <subject text>
@@ -270,9 +329,22 @@ function runCmd(g: Game, b: Block, c: string, rest: string, w: string[], aiReady
     case 'help': res(b, helpText(g.def)); break
     case 'clear': break
     case 'hangup': msg(b, 'You are not on a call.', 'warn'); break
-    case 'alerts': {
+    case 'alerts':
+    case 'tickets': {
       const open = g.def.alerts.filter((a) => g.arrived.has(a.id) && !g.decided[a.id])
-      res(b, open.length ? open.map((a) => `${a.id}  ${a.title}  [${a.ent}]`).join('\n') : 'No open alerts.')
+      res(b, open.length ? open.map((a) => `${g.tickets[a.id]?.num}  ${a.id}  ${ticketStatus(g, a.id).padEnd(11)} ${a.sev.toUpperCase().padEnd(6)} ${a.title}  [${a.ent}]`).join('\n') : 'No open tickets.')
+      break
+    }
+    case 'claim': {
+      const q = (arg || g.sel || '').trim().toLowerCase()
+      const al = g.def.alerts.find((x) => x.id.toLowerCase() === q || g.tickets[x.id]?.num.toLowerCase() === q)
+      const r = claimTicket(g, al?.id ?? q)
+      if (r.ok && al) { g.sel = al.id; msg(b, r.msg, 'ok') } else { msg(b, r.msg, 'bad'); b.cost = 0 }
+      break
+    }
+    case 'note': {
+      const r = addNote(g, g.sel, rest)
+      msg(b, r.msg, r.ok ? 'ok' : 'bad')
       break
     }
     case 'fields': {
@@ -306,6 +378,7 @@ function runCmd(g: Game, b: Block, c: string, rest: string, w: string[], aiReady
     case 'badge': { const u = arg.toLowerCase(); res(b, it.badge[u] || (userOf(g, u) ? `${u}: normal swipe pattern, nothing unusual.` : 'Unknown user.')); break }
     case 'hr': { const u = arg.toLowerCase(); res(b, it.hr[u] || (userOf(g, u) ? `${userOf(g, u)!.dept} · no flags on file.` : 'Unknown user.')); break }
     case 'ask-it': res(b, it.askIt(rest)); break
+    case 'helpdesk':
     case 'ticket': res(b, it.tickets[arg.toLowerCase()] || `Ticket ${arg} not found.`); break
     case 'hint': {
       if (g.mode !== 'training') { msg(b, 'Hints are disabled in exam mode.', 'warn'); break }
@@ -407,7 +480,7 @@ export function advance(g: Game, mins: number): void {
     for (const a of g.def.alerts) {
       if (g.arrived.has(a.id)) continue
       if (a.late && !g.flags[a.late]) continue
-      if (a.at <= g.clock) { g.arrived.add(a.id); log(g, `New alert ${a.id}: ${a.title}`); g.toasts.push(`New alert: ${a.title}`) }
+      if (a.at <= g.clock) { arrive(g, a); log(g, `New alert ${a.id}: ${a.title}`); g.toasts.push(`New alert: ${a.title}`) }
     }
     if (g.clock >= g.def.end) { endShift(g); break }
   }
@@ -431,8 +504,16 @@ export function pinnedKeys(g: Game): Set<string> {
 }
 export function reqMet(g: Game, r: string): boolean { return r.startsWith('c_') ? !!g.def.checks[r]?.(g) : pinnedKeys(g).has(r) }
 
-export function submitVerdict(g: Game, alertId: string, v: Verdict, note: string): void {
+export function submitVerdict(g: Game, alertId: string, v: Verdict, note: string, opts?: { sev?: Sev; esc?: Escalation }): void {
   if (g.decided[alertId]) return
+  const esc = v === 'incident' || v === 'insider'
+  const tk = g.tickets[alertId]
+  if (tk) {
+    if (!tk.owner) tk.owner = 'you'
+    if (opts?.sev) tk.sev = opts.sev
+    if (esc && opts?.esc) { tk.esc = opts.esc; note = ESC_FIELDS.map(([k, l]) => `${l}: ${opts.esc![k]}`).join('\n') }
+    tk.trail.push({ t: g.clock, m: `${esc ? 'Escalated' : v === 'it' ? 'Transferred to IT / Ops' : 'Closed'}: ${VLABEL[v]}` })
+  }
   g.decided[alertId] = { v, t: g.clock, note }
   log(g, `${alertId} decided: ${VLABEL[v]}`)
   if (g.mode === 'training') {
@@ -444,11 +525,11 @@ export function submitVerdict(g: Game, alertId: string, v: Verdict, note: string
 }
 
 export const VERDICTS: [Verdict, string][] = [
-  ['incident', 'Escalate: security incident'],
+  ['incident', 'Escalate to IR: true positive, security incident'],
   ['fp', 'Close: false positive (rule was wrong)'],
-  ['benign', 'Close: expected activity (rule right, nothing bad)'],
-  ['it', 'Hand to IT / Ops'],
-  ['insider', 'Escalate: HR + insider risk'],
+  ['benign', 'Close: true positive but expected activity'],
+  ['it', 'Transfer to IT / Ops'],
+  ['insider', 'Escalate to HR + insider risk'],
 ]
 export const VLABEL: Record<string, string> = Object.fromEntries(VERDICTS)
 
@@ -470,6 +551,29 @@ export function gradeAlert(g: Game, a: Alert): AlertGrade {
   return out
 }
 
+// Ticket-handling points, kept apart from the verdict grade: acknowledging in
+// time, assessing severity, and (for a true escalation) a complete handover.
+const RANK: Record<Sev, number> = { low: 0, med: 1, high: 2 }
+const goodField = (v: string | undefined): boolean => !!v && v.trim().length >= 20 && v.trim().split(/\s+/).length >= 4
+export function gradeTicket(g: Game, a: Alert): { pts: number; notes: string[]; escOk: number } {
+  const t = g.tickets[a.id]
+  const out = { pts: 0, notes: [] as string[], escOk: 0 }
+  if (!t) return out
+  if (t.claimedAt !== undefined && t.claimedAt > a.at + ACK_MIN[a.sev] * 60) { out.pts -= 10; out.notes.push(`Slow to acknowledge (target ${ACK_MIN[a.sev]} min)`) }
+  const d = g.decided[a.id]
+  if (!d) return out
+  if (t.sev) {
+    const diff = Math.abs(RANK[t.sev] - RANK[trueSev(a)])
+    if (diff === 0) out.pts += 10
+    else if (diff === 2) { out.pts -= 10; out.notes.push(`Severity ${t.sev} vs real ${trueSev(a)}`) }
+  }
+  const escalated = d.v === 'incident' || d.v === 'insider'
+  if (escalated && (a.best === 'incident' || a.best === 'insider')) {
+    if (!t.esc) { out.pts -= 20; out.notes.push('Escalated with no handover summary') }
+    else { out.escOk = ESC_FIELDS.filter(([k]) => goodField(t.esc![k])).length; out.pts += 5 * out.escOk }
+  }
+  return out
+}
 export interface ContainGrade { items: { label: string; pts: number; done: boolean }[]; bad: { label: string; pts: number }[]; pts: number }
 export function gradeContain(g: Game): ContainGrade {
   const items = g.def.contain.filter((c) => !c.when || c.when(g)).map((c) => ({ label: c.label, pts: c.pts, done: c.t(g) }))
@@ -479,14 +583,14 @@ export function gradeContain(g: Game): ContainGrade {
 }
 export function total(g: Game, final: boolean): number {
   let t = 0
-  for (const a of g.def.alerts) { const gr = gradeAlert(g, a); if (g.decided[a.id] || final) t += gr.pts }
+  for (const a of g.def.alerts) { const gr = gradeAlert(g, a); if (g.decided[a.id] || final) t += gr.pts; if (g.decided[a.id] || g.tickets[a.id]?.owner) t += gradeTicket(g, a).pts }
   t += gradeContain(g).pts - 5 * g.hints
   for (const tr of g.def.triggers) if (g.flags[tr.flag]) t -= tr.penalty
   return t
 }
 export function maxScore(g: Game): number {
   let m = 0
-  for (const a of g.def.alerts) { if (a.late && !g.flags[a.late]) continue; m += 100 + 25 * a.req.length }
+  for (const a of g.def.alerts) { if (a.late && !g.flags[a.late]) continue; m += 100 + 25 * a.req.length + 10 + (a.best === 'incident' || a.best === 'insider' ? 20 : 0) }
   return m + g.def.contain.filter((c) => !c.when || c.when(g)).reduce((s, c) => s + c.pts, 0)
 }
 export function openAlerts(g: Game): Alert[] { return g.def.alerts.filter((a) => g.arrived.has(a.id) && !g.decided[a.id]) }
