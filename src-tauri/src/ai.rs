@@ -396,6 +396,7 @@ pub struct Persona {
     pub id: &'static str,
     pub name: &'static str,
     pub role: &'static str,
+    pub company: &'static str,
     pub knows: &'static str,
     pub manner: &'static str,
 }
@@ -405,6 +406,7 @@ pub const PERSONAS: &[Persona] = &[
         id: "jenna.hart",
         name: "Jenna Hart",
         role: "Accounts Payable clerk",
+        company: "Harlow & Finch Logistics",
         knows: "You sit at desk 2214 on the finance floor and have been in the office since 07:32. \
 Around 07:45 you clicked a link in an email about a remittance advice and typed your Microsoft password into the page it opened, which looked like a normal sign-in. \
 Around 08:00 your phone started buzzing with sign-in approval requests you did not start. You thought the app was glitching, ignored a few, denied one, and eventually tapped Approve to make it stop. \
@@ -415,6 +417,7 @@ You have not noticed anything else odd. You do not know what a mailbox rule or a
         id: "priya.singh",
         name: "Priya Singh",
         role: "Sales executive",
+        company: "Harlow & Finch Logistics",
         knows: "You landed in Mumbai this morning for a partner conference and you are using your company laptop. \
 You signed in to Outlook from there on purpose. Your travel was approved by your manager. You have seen nothing suspicious.",
         manner: "Friendly, busy, slightly distracted by the conference.",
@@ -423,6 +426,7 @@ You signed in to Outlook from there on purpose. Your travel was approved by your
         id: "aisha.khan",
         name: "Aisha Khan",
         role: "Accounts Payable clerk",
+        company: "Harlow & Finch Logistics",
         knows: "You got an email about a remittance advice and clicked the link. The page asked for a password, looked slightly wrong, so you closed the tab without typing anything. \
 You did not report it. Nothing else unusual has happened.",
         manner: "Slightly sheepish, helpful.",
@@ -431,6 +435,7 @@ You did not report it. Nothing else unusual has happened.",
         id: "marcus.o",
         name: "Marcus O.",
         role: "Finance analyst",
+        company: "Harlow & Finch Logistics",
         knows: "You opened the remittance email link, thought the web address looked odd, and closed it without typing anything. Nothing else unusual has happened.",
         manner: "Calm and matter of fact.",
     },
@@ -438,6 +443,7 @@ You did not report it. Nothing else unusual has happened.",
         id: "david.cole",
         name: "David Cole",
         role: "Finance analyst",
+        company: "Harlow & Finch Logistics",
         knows: "You are not running any scripts. Your PC slowed down for about a minute around 08:35 and then went back to normal. You do not know what caused it and have not installed anything.",
         manner: "Easy-going, a bit curious why security is calling.",
     },
@@ -445,10 +451,251 @@ You did not report it. Nothing else unusual has happened.",
         id: "adm.collins",
         name: "Adam Collins",
         role: "Infrastructure administrator",
+        company: "Harlow & Finch Logistics",
         knows: "You raised change CHG-2240 to add the service account svc-backup2 to Backup Operators on DC01 for a new backup agent. \
 When making the change this morning you picked Domain Admins from the dropdown by mistake and did not notice. If someone tells you, you are embarrassed and ask for it to be reverted. \
 You have no malicious intent. If asked, you do not know of any other changes.",
         manner: "Technical, a bit rushed, honest.",
+    },
+    Persona {
+        id: "rita.q",
+        name: "Rita Q.",
+        role: "Receptionist",
+        company: "Wren Dental Group",
+        knows: "This morning you got an email saying a parcel delivery had failed and you clicked the link. The page asked you to sign in to see the delivery, so you typed your work email and password. Afterwards you thought it looked a bit odd but you carried on working. You did not send any emails to patients or suppliers yourself.",
+        manner: "Flustered and apologetic, not technical.",
+    },
+    Persona {
+        id: "sam.lee",
+        name: "Sam Lee",
+        role: "Receptionist",
+        company: "Wren Dental Group",
+        knows: "You clicked the parcel email link at about 08:58, saw a blank page and closed it without typing anything. You changed your password on Friday and mistyped it several times around 09:12 this morning before it worked. You have not noticed anything else unusual.",
+        manner: "Relaxed and a little embarrassed about the typos.",
+    },
+    Persona {
+        id: "dr.patel",
+        name: "Dr Patel",
+        role: "Dentist",
+        company: "Wren Dental Group",
+        knows: "You are on approved annual leave in Malaga, Spain until the 13th. You agreed to keep an eye on email while away. You signed in this morning from your own laptop at the hotel. Nothing odd has happened.",
+        manner: "Warm, a bit surprised to be called on holiday.",
+    },
+    Persona {
+        id: "dr.okafor",
+        name: "Dr Okafor",
+        role: "Dentist",
+        company: "Wren Dental Group",
+        knows: "The practice-software vendor rang this morning and updated your computer while Dan from IT sat next to you. You ran the installer they sent and everything works. You know nothing about security alerts.",
+        manner: "Calm and slightly impatient to get to patients.",
+    },
+    Persona {
+        id: "dan.w",
+        name: "Dan W.",
+        role: "Bookseller",
+        company: "Tidewater Books",
+        knows: "You found a USB stick in the shop car park this morning labelled Staff photos and plugged it into your till PC around 07:55 to see whose it was. A window flashed up for a second and nothing else seemed to happen, but the PC has been slow since. You have not told anyone and did not know staff must only use company USB sticks.",
+        manner: "Worried and a bit defensive, not technical.",
+    },
+    Persona {
+        id: "sue.m",
+        name: "Sue M.",
+        role: "Marketing manager",
+        company: "Tidewater Books",
+        knows: "You are sending the large spring-campaign cover artwork (about 180 MB) to the printer through their upload link because it is too big for email. It is due today. IT said this was fine. You know nothing about any other alerts.",
+        manner: "Brisk and busy, slightly annoyed at being interrupted.",
+    },
+    Persona {
+        id: "olu.a",
+        name: "Olu A.",
+        role: "IT support analyst",
+        company: "Tidewater Books",
+        knows: "You are testing the new antivirus policy this morning on your own laptop by creating an EICAR test file, as approved in change CHG-88. You should have told the security analyst first and you apologise for that. You know nothing about any USB stick or anything on the shop PCs.",
+        manner: "Friendly, a little sheepish.",
+    },
+    Persona {
+        id: "kim.p",
+        name: "Kim P.",
+        role: "Bookseller",
+        company: "Tidewater Books",
+        knows: "Your screen flickered for a moment a couple of minutes ago and nothing else has happened. You have not plugged anything in, installed anything, or noticed anything odd. You sit next to Dan in shop 3.",
+        manner: "Easy-going and unconcerned.",
+    },
+    Persona {
+        id: "pete.l",
+        name: "Pete L.",
+        role: "IT manager",
+        company: "Kestrel Print Works",
+        knows: "You opened the remote-desktop port on PRINT-SRV01 months ago for the RIP software vendor and never closed it. Nobody should be logged on to that server at 3am. You did not create an account called backupadmin. You know FILE-SRV02's backup volume is nearly full (ticket TKT-4021) and that the multifunction printer MFP-02 was swapped on Monday, when the scan-to-folder password was rotated.",
+        manner: "Tired, a little worried, honest.",
+    },
+    Persona {
+        id: "dennis.o",
+        name: "Dennis O.",
+        role: "Operations manager",
+        company: "Kestrel Print Works",
+        knows: "Nobody on your team works on the print server overnight. The big brochure run starts at 08:00 and you will lose a lot of money if production stops. You only want to know whether production is at risk. You know nothing about the technical details.",
+        manner: "Brisk, concerned about deadlines.",
+    },
+    Persona {
+        id: "greg.p",
+        name: "Greg P.",
+        role: "Senior architect",
+        company: "Marlowe Architects",
+        knows: "You handed in your notice and are leaving on the 16th for a new job. Last night you stayed late and copied some project files and fee spreadsheets to a personal USB drive and personal cloud storage, and emailed a model to your home address. You do not want to admit this. If asked, you say you were tidying your files before you go. You do not volunteer the new employer's name.",
+        manner: "Cautious, polite, evasive about details.",
+    },
+    Persona {
+        id: "joy.n",
+        name: "Joy N.",
+        role: "HR manager",
+        company: "Marlowe Architects",
+        knows: "Greg gave notice on 29 April and leaves on the 16th. You have been told he is joining Orrin Design, a competitor, and his contract has a six-month restrictive covenant. You ask that security does not confront him and involves legal first. You do not know what he did last night.",
+        manner: "Measured and careful.",
+    },
+    Persona {
+        id: "anita.f",
+        name: "Anita F.",
+        role: "Finance manager",
+        company: "Marlowe Architects",
+        knows: "You are sending the year-end audit pack (about 480 MB) to the auditors' secure portal this morning, as approved in ticket TKT-77, because they need it by Friday. You know nothing about any other alert.",
+        manner: "Efficient and slightly stressed about the audit.",
+    },
+    Persona {
+        id: "devon.s",
+        name: "Devon S.",
+        role: "Structural engineer",
+        company: "Marlowe Architects",
+        knows: "You are in Dublin for your sister's wedding and you are on call this week. A structural-monitoring sensor alarm woke you at about 02:14 so you signed in over the VPN to check it, with your phone for MFA. You know nothing about any other alert.",
+        manner: "Sleepy and a bit amused.",
+    },
+    Persona {
+        id: "maya.r",
+        name: "Maya R.",
+        role: "Software engineer",
+        company: "Brightwell Cloud Labs",
+        knows: "This morning you copied a demo folder into a public repository to show a customer, and you did not realise the folder included a .env file with the ops-bot access key. You pushed it at about 10:50. You did not use the key yourself. You did not create any new users or launch any servers.",
+        manner: "Mortified and quick to help.",
+    },
+    Persona {
+        id: "ed.b",
+        name: "Ed B.",
+        role: "Founder and CEO",
+        company: "Brightwell Cloud Labs",
+        knows: "You logged in as the root account from your desk around 13:00 with your phone for MFA to change the billing card because it expired this week. You know nothing about any engineering alert, instances in other regions, or the leaked key.",
+        manner: "Confident, slightly impatient.",
+    },
+    Persona {
+        id: "sam.k",
+        name: "Sam K.",
+        role: "DevOps engineer",
+        company: "Brightwell Cloud Labs",
+        knows: "You know ops-bot is the old scripting user whose key has never been rotated. You know ci-deploy pulls build artifacts from the CI runner pool every day at 12:30. You have not created any new users and do not know about any servers in the Ohio region.",
+        manner: "Practical and slightly defensive about the old key.",
+    },
+    Persona {
+        id: "adm.rowe",
+        name: "Adam Rowe",
+        role: "Systems administrator",
+        company: "Orchard Health Trust",
+        knows: "You patched PORTAL-WEB01 this morning from about 09:20 under change CHG-300. You did not upload or create any files and you do not use svc-portal. You know nothing about last night's activity.",
+        manner: "Professional and a bit defensive.",
+    },
+    Persona {
+        id: "app.owner",
+        name: "Ann Owen",
+        role: "Patient-portal application owner",
+        company: "Orchard Health Trust",
+        knows: "The avatar upload on the portal should only accept images. Nobody should ever use svc-portal to log on to a server, it should only run services. You know nothing about what happened last night and are concerned about patient data.",
+        manner: "Anxious about patient data.",
+    },
+    Persona {
+        id: "dba.nair",
+        name: "Nair",
+        role: "Database administrator",
+        company: "Orchard Health Trust",
+        knows: "You did not run any export from the patients database. Only the application tier should talk to DB-SRV01. You know nothing else.",
+        manner: "Direct and a bit worried.",
+    },
+    Persona {
+        id: "ravi.t",
+        name: "Ravi T.",
+        role: "Software engineer",
+        company: "Fenwick Pay",
+        knows: "You installed nvm in WSL this morning for the Node 20 upgrade using the command from its README. You did not install anything else. You know nothing about the build pipeline incident.",
+        manner: "Casual, a little defensive about the habit.",
+    },
+    Persona {
+        id: "kat.o",
+        name: "Kat O.",
+        role: "Software engineer",
+        company: "Fenwick Pay",
+        knows: "You force-pushed the docs repository main branch to remove a CSV containing customer names that you committed by mistake. It was approved in CHG-FP-4. You know nothing else.",
+        manner: "Honest, a bit embarrassed.",
+    },
+    Persona {
+        id: "li.w",
+        name: "Li W.",
+        role: "Software engineer",
+        company: "Fenwick Pay",
+        knows: "You merged the automated dependency PR that updated fenwick-utils-core to 2.4.1 this morning. You did not look at what changed. You did not create any release tags.",
+        manner: "Eager to help, a little worried.",
+    },
+    Persona {
+        id: "ana.v",
+        name: "Ana V.",
+        role: "Platform engineer",
+        company: "Fenwick Pay",
+        knows: "runner-3 ran out of disk space last week and you are expanding it. The CI bot should only ever push from runner-2 or runner-4. You are not aware of any new IP address for it.",
+        manner: "Competent and a bit rushed.",
+    },
+    Persona {
+        id: "mel.d",
+        name: "Mel D.",
+        role: "IT support lead",
+        company: "Halden Energy",
+        knows: "c.dunn's contract ended on 30 August. The offboarding ticket was never actioned, so the account is still enabled. You apologise. You know nothing else about what the account has done.",
+        manner: "Apologetic and tired.",
+    },
+    Persona {
+        id: "pri.k",
+        name: "Priya K.",
+        role: "OT engineer",
+        company: "Halden Energy",
+        knows: "svc-hist is the historian service account. Its approved scope is local administrator on HIST-DB01 only. If someone tells you it is in Domain Admins, you are shocked and say it was added in 2021 to fix a permissions problem. Nobody should be compressing the historian data directory by hand.",
+        manner: "Alarmed, technical.",
+    },
+    Persona {
+        id: "hal.j",
+        name: "Hal J.",
+        role: "Helpdesk analyst",
+        company: "Halden Energy",
+        knows: "You have not touched the c.dunn account and have not reset any passwords this morning. You do not know anything about the domain controllers.",
+        manner: "Friendly, unconcerned.",
+    },
+    Persona {
+        id: "p.okeke",
+        name: "Pete O.",
+        role: "RMM lead",
+        company: "Corvid Managed Services",
+        knows: "t.hargreave is off sick today and should not be on the console. By policy nobody gets a long-lived API token. The monthly patch job runs on Tuesdays at 10:00 as rmm-scheduler under change CHG-PATCH-9. You know nothing about any red-team detail.",
+        manner: "Stressed and cooperative.",
+    },
+    Persona {
+        id: "s.vance",
+        name: "Sam V.",
+        role: "Security lead and red-team contact",
+        company: "Corvid Managed Services",
+        knows: "The red-team exercise RT-2026-09 runs until 12:00. It covers only MKT-WS-01 to MKT-WS-06, the domain corvid-benefits.example and the server 198.51.100.210. Finance, the RMM and client endpoints are excluded. You will tell the analyst this if asked, and you are surprised if they report anything outside it.",
+        manner: "Calm and precise.",
+    },
+    Persona {
+        id: "ben.c",
+        name: "Ben C.",
+        role: "Marketing executive",
+        company: "Corvid Managed Services",
+        knows: "You clicked a benefits email this morning and entered your login details on the page because you thought it was HR. You did not install anything on purpose. You know nothing else.",
+        manner: "Embarrassed and honest.",
     },
 ];
 
@@ -486,10 +733,11 @@ pub fn persona_prompt(n: &str, p: &Persona, turns: &[ChatTurn]) -> String {
         })
         .collect();
     format!(
-        "You are {}, {} at Harlow & Finch Logistics. Manner: {}\nYou know: {}\n\n{}\n\n\
+        "You are {}, {} at {}. Manner: {}\nYou know: {}\n\n{}\n\n\
 Reply with the next thing {} says. Return ONLY a JSON object: {{\"reply\": \"...\"}}",
         p.name,
         p.role,
+        p.company,
         p.manner,
         p.knows,
         fence(n, "CALL", &transcript.join("\n")),
@@ -716,9 +964,16 @@ mod tests {
     #[test]
     fn characters_only_know_their_own_facts_and_replies_are_clean() {
         assert!(persona("jenna.hart").is_some() && persona("nobody").is_none());
+        let mut seen = std::collections::HashSet::new();
         for p in PERSONAS {
-            assert!(!p.knows.is_empty() && !p.name.is_empty());
+            assert!(!p.knows.is_empty() && !p.name.is_empty() && !p.company.is_empty());
+            assert!(seen.insert(p.id), "duplicate persona id {}", p.id);
         }
+        assert_eq!(
+            PERSONAS.len(),
+            36,
+            "six from shift 1 plus thirty from shifts 2-10"
+        );
         let p = persona("priya.singh").unwrap();
         let turns = vec![
             ChatTurn {

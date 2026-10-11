@@ -55,3 +55,20 @@ export function b64utf16(s: string): string {
   for (const ch of s) { const c = ch.charCodeAt(0); bin += String.fromCharCode(c & 255, c >> 8) }
   return btoa(bin)
 }
+
+// Loop over yesterday (full working day) and today (up to `endToday`) for each user.
+export function eachDay(users: User[], endToday: number, fn: (u: User, base: number, end: number, day: number) => void): void {
+  for (const d of [-1, 0]) for (const u of users) fn(u, d * 86400, d < 0 ? hm(17, 30) : endToday, d)
+}
+
+// Did the analyst run a command matching this pattern? (used by the c_ checks)
+export const did = (g: { hist: string[] }, re: RegExp): boolean => g.hist.some((h) => re.test(h))
+// Has every one of these containment actions been taken? Keys are lower-case, as the engine records them.
+export const acted = (g: { actions: Set<string> }, ...keys: string[]): boolean => keys.every((k) => g.actions.has(k))
+export const anyActed = (g: { actions: Set<string> }, ...keys: string[]): boolean => keys.some((k) => g.actions.has(k))
+
+export function defaultNoteTail(a: { best: string }): string {
+  return a.best === 'incident'
+    ? 'It should also say what was contained and what still needs doing.'
+    : 'It should say why nothing needs escalating, or who it was handed to.'
+}

@@ -351,7 +351,7 @@ function Debrief({ g, aiReady, onClose, onAgain }: { g: Game; aiReady: boolean; 
       <div className="sh-sheet">
         <div className="mono tiny accent">SHIFT DEBRIEF</div>
         <h2 className="h1" style={{ marginTop: 4 }}>{grade}: {tot} points ({pct}% of {max} available)</h2>
-        <p className="small muted">{g.def.triggers.map((t) => t.note(!!g.flagDone[t.flag], !!g.flags[t.flag])).join(' ')} Hints used: {g.hints}.</p>
+        <p className="small muted">{[...new Set(g.def.triggers.map((t) => t.note(!!g.flagDone[t.flag], !!g.flags[t.flag])))].join(' ')} Hints used: {g.hints}.</p>
 
         <div className="sh-h2">WHAT ACTUALLY HAPPENED</div>
         <div className="sh-tl">

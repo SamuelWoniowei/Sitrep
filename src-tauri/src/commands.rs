@@ -1046,7 +1046,9 @@ pub fn get_more(state: State<'_, AppState>) -> Res<Vec<core::MoreItem>> {
 // ---------------- SOC shift ----------------
 
 /// Shifts that exist. Anything else is rejected, so the UI cannot write arbitrary keys.
-const SHIFT_IDS: &[&str] = &["soc-1"];
+const SHIFT_IDS: &[&str] = &[
+    "soc-1", "soc-2", "soc-3", "soc-4", "soc-5", "soc-6", "soc-7", "soc-8", "soc-9", "soc-10",
+];
 const SHIFT_KEY: &str = "shift_results";
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
