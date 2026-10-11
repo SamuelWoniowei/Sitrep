@@ -110,7 +110,8 @@ More detail is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Roadmap
 
-- macOS build
+- Shifts online lab: the same simulator as a hosted web lab (needs a small backend holding the AI key, rate limits and a spend cap)
+- GRC lab: risk registers, control mapping and audit-evidence exercises in the same style as the SOC shifts
 - Code-signed Windows installer (SignPath for open source)
 - System tray and a morning notification
 - Optional cloud AI (bring your own key, stored in the OS keychain)
@@ -156,6 +157,7 @@ News comes from BleepingComputer, The Record, The Hacker News, the UK NCSC, the 
 
 ## v0.5.2
 
+- **Ten SOC shifts**, from Starter to Expert, picked on the SOC shift page. Each is a different fictional company and a different attack, with its own logs, decoy alerts, people to phone and deadlines: a phished receptionist (Starter), a found USB stick (Starter), an exposed RDP port and ransomware (Easy), a leaver copying client files (Easy), the original business-email-compromise shift (Medium), a leaked cloud key (Medium), a web shell on a patient portal (Hard), a poisoned dependency in a CI pipeline (Hard), Kerberoasting to a golden ticket (Expert), and an authorised red team running alongside a real attack on a managed-service provider (Expert). Every shift can be solved (the tests play a scripted perfect run of each one) and blanket strategies like "escalate everything" score badly. Shifts are plain data files in `src/shift/shifts/`, so adding one is one file plus an id.
 - Rail grouped into 8 sections with tabs (Train, Portfolio, Weekly; Systems under Settings).
 - "Am I affected?" now works on a Mac: it reads app names from /Applications and Homebrew folders (no commands run, nothing stored or sent).
 - Mac voice: Listen mode picks the best on-device macOS voice (premium/enhanced British first, novelty voices skipped). The downloadable Piper voice stays Windows only, because Piper's macOS release for this version is unusable (its "aarch64" binary is x86_64 and the libraries it needs are missing from the archive).

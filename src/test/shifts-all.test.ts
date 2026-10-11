@@ -1,6 +1,7 @@
 // Checks that apply to every shift in the catalogue, so a new shift file is
 // held to the same bar: unique ids, resolvable keys, only documentation IPs,
 // a scripted perfect run that scores well, and doing nothing that scores badly.
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { SHIFTS, LEVELS } from '../shift'
 import { advance, exec, gradeAlert, gradeContain, maxScore, newGame, submitVerdict, togglePin, total, type Game } from '../shift/engine'
@@ -62,7 +63,7 @@ describe.each(SHIFTS.map((s) => [s.id, s] as const))('%s', (_id, def) => {
       if (a.late) expect(def.triggers.some((t) => t.flag === a.late), `${a.id} late flag`).toBe(true)
     }
     for (const e of sc.events) if (e.cond) expect(def.triggers.some((t) => t.flag === e.cond), `event cond ${e.cond}`).toBe(true)
-    expect(def.alerts.filter((a) => a.best === 'incident').length).toBeGreaterThan(0)
+    expect(def.alerts.filter((a) => a.best === 'incident' || a.best === 'insider').length).toBeGreaterThan(0)
     expect(def.alerts.some((a) => a.best !== 'incident')).toBe(true)
     for (const [id] of def.solution.verdicts) expect(ids).toContain(id)
   })
@@ -92,5 +93,31 @@ describe.each(SHIFTS.map((s) => [s.id, s] as const))('%s', (_id, def) => {
     advance(idle, 600)
     for (const t of def.triggers) expect(idle.flags[t.flag], t.flag).toBe(true)
     expect(total(idle, true)).toBeLessThan(total(good, true))
+  })
+  it('blanket strategies fail: escalate everything, or close everything', () => {
+    const best = total(perfect(def), true)
+    for (const v of ['incident', 'benign'] as const) {
+      const g = newGame('exam', def)
+      for (let i = 0; i < 120 && !g.over; i++) {
+        advance(g, 1)
+        for (const a of def.alerts) if (g.arrived.has(a.id) && !g.decided[a.id]) submitVerdict(g, a.id, v, 'x')
+      }
+      expect(total(g, true), v).toBeLessThan(best * 0.5)
+    }
+  })
+})
+
+describe('Rust side stays in step with the catalogue', () => {
+  const ai = readFileSync('src-tauri/src/ai.rs', 'utf8')
+  const cmds = readFileSync('src-tauri/src/commands.rs', 'utf8')
+  it('knows every shift id, so results can be saved', () => {
+    const block = cmds.match(/const SHIFT_IDS: &\[&str\] = &\[([\s\S]*?)\];/)![1]
+    const ids = [...block.matchAll(/"([^"]+)"/g)].map((m) => m[1])
+    expect(ids.sort()).toEqual(SHIFTS.map((s) => s.id).sort())
+  })
+  it('has a character for everyone you can phone, and no duplicates', () => {
+    const personas = [...ai.matchAll(/^\s{8}id: "([^"]+)",/gm)].map((m) => m[1])
+    expect(new Set(personas).size).toBe(personas.length)
+    for (const s of SHIFTS) for (const c of s.callable) expect(personas, `${s.id}: ${c}`).toContain(c)
   })
 })

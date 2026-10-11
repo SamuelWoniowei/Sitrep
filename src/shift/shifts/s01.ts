@@ -4,7 +4,7 @@
 // plus two residential-looking examples used in the decoys). Nothing here
 // touches a real system.
 import { hm, m, makeScenario, memo } from '../common'
-import type { Alert, Containment, GameView, ShiftDef, TimelineRow, User, Val, Verdict, Wrong } from '../types'
+import type { Alert, Containment, GameView, ShiftDef, TimelineRow, User, Wrong } from '../types'
 
 export const SHIFT_ID = 'soc-1'
 export const DOM = 'harlowfinch.example'
