@@ -154,7 +154,7 @@ News comes from BleepingComputer, The Record, The Hacker News, the UK NCSC, the 
 - Stories that led an earlier day's brief no longer lead today's brief unless nothing fresher exists.
 - **More news**: Today now lists the 15 newest stories that aren't in the brief, newest first. They open the original article in your browser.
 
-## Unreleased (next version)
+## v0.5.0
 
 - **SOC shift** (new page): a training simulator. You are the only analyst on a morning shift at a fictional company, from 08:30 to 11:00. Eight alerts arrive over time, some real and some routine. You investigate by typing SIEM-style searches across mail, proxy, Entra ID, Exchange, EDR, VPN and Active Directory logs (about 2,500 simulated events), look up indicators, phone people, pin evidence, decide, and contain with typed commands. A debrief shows what really happened (mapped to MITRE ATT&CK), what you found and missed, and which controls would have stopped it. Training mode gives hints and live feedback; exam mode gives neither until the end. Your best score is saved on this PC. Everything is simulated: invented names, domains and documentation-range IPs.
 - **AI on the shift** (optional, local Ollama only): people you phone are played by the model and only know what they would really know, and you can ask for feedback on your handover notes. Feedback is advice and never changes your score. Without Ollama, phone calls return fixed answers and notes are simply not reviewed.

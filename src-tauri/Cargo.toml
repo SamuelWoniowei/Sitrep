@@ -1,6 +1,6 @@
 [package]
 name = "sitrep"
-version = "0.4.4"
+version = "0.5.0"
 description = "A calm, private, daily cybersecurity brief for your desktop"
 authors = ["Samuel Woniowei"]
 license = "MIT"
