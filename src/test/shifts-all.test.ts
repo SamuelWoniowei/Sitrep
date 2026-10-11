@@ -3,7 +3,7 @@
 // a scripted perfect run that scores well, and doing nothing that scores badly.
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { SHIFTS, LEVELS } from '../shift'
+import { SHIFTS, LEVELS } from '../shift/index'
 import { advance, exec, gradeAlert, gradeContain, maxScore, newGame, submitVerdict, togglePin, total, type Game } from '../shift/engine'
 import type { ShiftDef } from '../shift/types'
 
