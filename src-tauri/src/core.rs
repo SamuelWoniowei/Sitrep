@@ -157,6 +157,7 @@ pub struct StoryCard {
     pub gist: String,
     pub plain: String,
     pub action: String,
+    pub basis: String,
     pub roles: Vec<AiRole>,
     pub cvss: Vec<CveScore>,
     pub developing: Vec<crate::intel::TimelineItem>,
@@ -200,6 +201,7 @@ pub fn fallback_summary(store: &Store, s: &StoryRow, cat: Category) -> AiSummary
         gist: String::new(),
         plain: String::new(),
         action: String::new(),
+        basis: String::new(),
         roles: Vec::new(),
         terms: glossary::terms_in(&text_of(s), 3)
             .into_iter()
@@ -236,6 +238,7 @@ pub fn story_card(store: &Store, s: &StoryRow, watch: &[String], read: bool) -> 
         gist: sum.gist,
         plain: sum.plain,
         action: sum.action,
+        basis: sum.basis,
         roles: sum.roles,
         cvss: s
             .cves

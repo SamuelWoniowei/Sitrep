@@ -217,7 +217,12 @@ export function StoryCard({ story, index, open, deeper, aiReady, hasNext, onOpen
             </form>
           )}
           {answer && <div className="answer">{answer}</div>}
-          {story.ai && <div className="muted tiny">Summary by your local AI. Check the source for anything important.</div>}
+          {story.ai && (
+            <div className="muted tiny">
+              Summary by your local AI{story.basis ? `, written from the ${story.basis}` : ''}.
+              {story.basis === 'feed snippet only' ? ' The full article could not be read, so details may be missing. Open the source for the whole story.' : ' Check the source for anything important.'}
+            </div>
+          )}
 
           <div className="actions">
             {story.has_link && (

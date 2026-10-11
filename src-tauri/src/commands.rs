@@ -3,7 +3,7 @@
 
 use std::sync::Mutex;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::State;
 use tauri_plugin_opener::OpenerExt;
 
@@ -446,7 +446,7 @@ pub async fn enhance_story(state: State<'_, AppState>, id: String) -> Res<StoryC
         let current = s
             .ai_json(&id)
             .and_then(|j| serde_json::from_str::<AiSummary>(&j).ok())
-            .map(|a| !a.gist.is_empty())
+            .map(|a| !a.gist.is_empty() && !a.basis.is_empty())
             .unwrap_or(false);
         if current {
             let read = s
@@ -471,8 +471,13 @@ pub async fn enhance_story(state: State<'_, AppState>, id: String) -> Res<StoryC
     let n = ai::nonce();
     let prompt = ai::summary_prompt(&n, &story.title, &body, &watch, &focus);
     let raw = ai::generate(&state.ai_client, &model, &prompt).await?;
-    let summary: AiSummary = ai::validate_summary(&raw)
+    let mut summary: AiSummary = ai::validate_summary(&raw)
         .ok_or("The AI gave an unusable answer; showing the source summary instead.")?;
+    summary.basis = if body.chars().count() >= ai::FULL_ARTICLE_CHARS {
+        "full article".into()
+    } else {
+        "feed snippet only".into()
+    };
     let s = lock(&state)?;
     intel::add_ai_terms(&s, &summary.terms, now());
     s.set_ai_json(
@@ -1036,4 +1041,88 @@ pub async fn make_facts(state: State<'_, AppState>) -> Res<Vec<ai::AiFact>> {
 pub fn get_more(state: State<'_, AppState>) -> Res<Vec<core::MoreItem>> {
     let s = lock(&state)?;
     Ok(core::more_stories(&s, now(), 15))
+}
+
+// ---------------- SOC shift ----------------
+
+/// Shifts that exist. Anything else is rejected, so the UI cannot write arbitrary keys.
+const SHIFT_IDS: &[&str] = &["soc-1"];
+const SHIFT_KEY: &str = "shift_results";
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+pub struct ShiftResult {
+    pub best: i32,
+    pub max: i32,
+    pub plays: u32,
+    pub last: i64,
+}
+
+fn load_shift_results(s: &Store) -> std::collections::BTreeMap<String, ShiftResult> {
+    s.setting(SHIFT_KEY)
+        .and_then(|j| serde_json::from_str(&j).ok())
+        .unwrap_or_default()
+}
+
+#[tauri::command]
+pub fn get_shift_results(
+    state: State<'_, AppState>,
+) -> Res<std::collections::BTreeMap<String, ShiftResult>> {
+    let s = lock(&state)?;
+    Ok(load_shift_results(&s))
+}
+
+/// Remember the best score for a shift. Only known shifts and sane scores are stored.
+#[tauri::command]
+pub fn save_shift_result(
+    state: State<'_, AppState>,
+    shift: String,
+    score: i32,
+    max: i32,
+) -> Res<ShiftResult> {
+    if !SHIFT_IDS.contains(&shift.as_str()) || !(-10_000..=10_000).contains(&score) || !(1..=10_000).contains(&max) {
+        return Err("Not a valid shift result.".into());
+    }
+    let s = lock(&state)?;
+    let mut all = load_shift_results(&s);
+    let r = all.entry(shift).or_default();
+    r.best = if r.plays == 0 { score } else { r.best.max(score) };
+    r.max = max;
+    r.plays = r.plays.saturating_add(1);
+    r.last = now();
+    let out = r.clone();
+    s.set_setting(SHIFT_KEY, &serde_json::to_string(&all).map_err(|e| e.to_string())?)
+        .map_err(|e| e.to_string())?;
+    Ok(out)
+}
+
+/// One line of a phone call with a character. The character's knowledge is
+/// built into the app; the UI only says who and what the analyst typed.
+#[tauri::command]
+pub async fn shift_chat(
+    state: State<'_, AppState>,
+    persona: String,
+    turns: Vec<ai::ChatTurn>,
+) -> Res<String> {
+    let p = ai::persona(&persona).ok_or("Unknown person.")?;
+    if turns.is_empty() || turns.len() > 60 {
+        return Err("Nothing to answer.".into());
+    }
+    let model = ai_model(&state).await?;
+    ai::generate_reply(&state.ai_client, &model, p, &turns).await
+}
+
+/// Advice on a handover note. Advice only: it never changes the score.
+#[tauri::command]
+pub async fn shift_feedback(
+    state: State<'_, AppState>,
+    facts: String,
+    note: String,
+) -> Res<ai::NoteFeedback> {
+    let note = to_plain(&note, 1500);
+    let facts: String = facts.chars().take(3000).collect();
+    if note.chars().count() < 10 {
+        return Err("Write a few sentences first.".into());
+    }
+    let model = ai_model(&state).await?;
+    ai::generate_note_feedback(&state.ai_client, &model, &facts, &note).await
 }

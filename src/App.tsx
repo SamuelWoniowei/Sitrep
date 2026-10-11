@@ -3,12 +3,13 @@ import { api, errText, type Today as TodayData } from './api'
 import { Today } from './Today'
 import { ActorsPage, AffectedPage, BacklogPage, BuiltPage, GlossaryPage, ProjectPage, RadarPage, RecapPage, SettingsPage, WatchlistPage } from './pages'
 import { LiveOpsPage } from './LiveOps'
+import { ShiftPage } from './Shift'
 import { DevelopingPage, HuntPage, LabPackPage, SystemsPage } from './ops'
 import { loadAnimations } from './prefs'
 import { LiveClock, Pulse, Wave } from './fx'
 import { briefScript, playParts, stopSpeaking, unlockAudio } from './listen'
 
-export type Page = 'today' | 'project' | 'backlog' | 'built' | 'recap' | 'radar' | 'glossary' | 'developing' | 'actors' | 'affected' | 'labpack' | 'hunt' | 'systems' | 'liveops' | 'watchlist' | 'settings'
+export type Page = 'today' | 'project' | 'backlog' | 'built' | 'recap' | 'radar' | 'glossary' | 'developing' | 'actors' | 'affected' | 'labpack' | 'hunt' | 'systems' | 'liveops' | 'shift' | 'watchlist' | 'settings'
 
 const NAV: { id: Page; label: string; group?: 'top' | 'mid' | 'learn' | 'bottom' }[] = [
   { id: 'today', label: 'TODAY', group: 'top' },
@@ -21,6 +22,7 @@ const NAV: { id: Page; label: string; group?: 'top' | 'mid' | 'learn' | 'bottom'
   { id: 'affected', label: 'AM I AFFECTED?', group: 'mid' },
   { id: 'labpack', label: 'LAB PACK', group: 'mid' },
   { id: 'hunt', label: 'LOG HUNT', group: 'mid' },
+  { id: 'shift', label: 'SOC SHIFT', group: 'mid' },
   { id: 'recap', label: 'SUNDAY SITREP', group: 'learn' },
   { id: 'radar', label: 'SKILLS RADAR', group: 'learn' },
   { id: 'glossary', label: 'GLOSSARY', group: 'learn' },
@@ -69,7 +71,7 @@ export default function App() {
     if (!data || enhancing.current) return
     enhancing.current = true
     try {
-      for (const s of data.stories.filter((x) => !x.ai || !x.gist)) {
+      for (const s of data.stories.filter((x) => !x.ai || !x.gist || !x.basis)) {
         try {
           const card = await api.enhance(s.id)
           setToday((t) => (t ? { ...t, stories: t.stories.map((x) => (x.id === card.id ? card : x)) } : t))
@@ -184,6 +186,7 @@ export default function App() {
           {page === 'affected' && <AffectedPage />}
           {page === 'labpack' && <LabPackPage />}
           {page === 'hunt' && <HuntPage />}
+          {page === 'shift' && <ShiftPage aiReady={aiReady} />}
           {page === 'systems' && <SystemsPage />}
           {page === 'liveops' && <LiveOpsPage onOpenStory={() => setPage('today')} />}
           {page === 'watchlist' && <WatchlistPage onChange={() => void reload()} />}
