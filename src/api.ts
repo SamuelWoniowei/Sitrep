@@ -20,6 +20,7 @@ export interface Story {
   gist: string
   plain: string
   action: string
+  basis: string
   roles: { role: string; note: string }[]
   cvss: { cve: string; score: number; severity: string; exploited: boolean }[]
   developing: { id: string; title: string; source: string; published: number; why: string }[]
@@ -45,6 +46,10 @@ export interface Systems { stories: number; kev: number; reads: number; oldest: 
 export interface Exposure { program: string; vendor: string; product: string; cves: string[]; latest_added: string; ransomware: boolean }
 export interface ExposureResult { supported: boolean; programs: number; window_days: number; matches: Exposure[] }
 export interface LabPackResult { folder: string; ips: number; domains: number; hashes: number }
+
+export interface ShiftResult { best: number; max: number; plays: number; last: number }
+export interface NoteFeedback { strengths: string[]; gaps: string[]; tip: string }
+export interface CallTurn { who: 'analyst' | 'persona'; text: string }
 
 export interface Quiz {
   day: string
@@ -184,6 +189,10 @@ export const api = {
   getName: () => invoke<string>('get_name'),
   aiFacts: () => invoke<{ tag: string; text: string }[]>('get_ai_facts'),
   makeFacts: () => invoke<{ tag: string; text: string }[]>('make_facts'),
+  shiftResults: () => invoke<Record<string, ShiftResult>>('get_shift_results'),
+  saveShiftResult: (shift: string, score: number, max: number) => invoke<ShiftResult>('save_shift_result', { shift, score, max }),
+  shiftChat: (persona: string, turns: CallTurn[]) => invoke<string>('shift_chat', { persona, turns }),
+  shiftFeedback: (facts: string, note: string) => invoke<NoteFeedback>('shift_feedback', { facts, note }),
   setName: (name: string) => invoke<string>('set_name', { name }),
   exportDigest: () => invoke<DigestResult>('export_digest'),
   huntLogs: () => invoke<HuntResult | null>('hunt_logs'),

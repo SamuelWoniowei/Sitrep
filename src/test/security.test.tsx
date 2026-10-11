@@ -23,6 +23,7 @@ const story: Story = {
   gist: evil,
   plain: evil,
   action: evil,
+  basis: evil,
   roles: [{ role: evil, note: evil }],
   developing: [{ id: 'x', title: evil, source: evil, published: 1, why: evil }],
   actors: [evil],
