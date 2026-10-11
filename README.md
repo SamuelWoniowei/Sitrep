@@ -154,7 +154,7 @@ News comes from BleepingComputer, The Record, The Hacker News, the UK NCSC, the 
 - Stories that led an earlier day's brief no longer lead today's brief unless nothing fresher exists.
 - **More news**: Today now lists the 15 newest stories that aren't in the brief, newest first. They open the original article in your browser.
 
-## Unreleased (next version)
+## v0.5.2
 
 - Rail grouped into 8 sections with tabs (Train, Portfolio, Weekly; Systems under Settings).
 - "Am I affected?" now works on a Mac: it reads app names from /Applications and Homebrew folders (no commands run, nothing stored or sent).
