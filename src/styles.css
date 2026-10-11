@@ -452,6 +452,7 @@ body::before { content: ''; position: fixed; inset: 0; z-index: 0; pointer-event
 .sh-brief { max-width: 880px; }
 .sh-card { margin: 0 0 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
 .sh-cheat { font: 12.5px/1.7 var(--mono); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; overflow-x: auto; margin: 10px 0 0; }
+.sh-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; margin: 14px 0; }
 .sh-modes { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0; }
 .sh-mode { flex: 1 1 220px; text-align: left; display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border: 1px solid var(--field); border-radius: 8px; background: transparent; }
 .sh-mode-on { border-color: var(--accent); background: #0f1d1b; }

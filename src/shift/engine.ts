@@ -1,10 +1,9 @@
 // The shift engine: a tiny SIEM-style query language, lookups, containment
-// commands, the clock, and scoring. Pure TypeScript with no network, storage
-// or DOM access, so it is easy to test.
-import {
-  ALERTS, ALERT_BY_ID, ATT, BY_NAME, CALLABLE, END, FIELDS, PHD, SRCDESC, START, VLABEL, hm, scenario,
-  type Alert, type Ev, type Src, type Verdict,
-} from './data'
+// commands, the clock, and scoring. It is generic: everything scenario-specific
+// comes from the active ShiftDef (see types.ts). Pure TypeScript with no
+// network, storage or DOM access, so it is easy to test.
+import type { Alert, Ev, ShiftDef, Verdict, TimelineRow, Scenario } from './types'
+import { hm } from './common'
 
 export type Mode = 'training' | 'exam'
 export interface ChatTurn { who: 'analyst' | 'persona'; text: string }
@@ -14,6 +13,7 @@ export type Item =
   | { k: 'rows'; vis: Ev[]; mode: 'raw' | 'table' | 'grid'; cols: string[]; grid?: { head: string[]; rows: (string | number)[][] } }
 export interface Block { cmd: string; cost: number; items: Item[]; meta?: string; skip?: boolean }
 export interface Game {
+  def: ShiftDef
   mode: Mode
   clock: number
   sel: string | null
@@ -24,8 +24,8 @@ export interface Game {
   hist: string[]
   cmdHist: string[]
   arrived: Set<string>
-  becDecided: boolean
-  bec: boolean
+  flags: Record<string, boolean> // set by triggers when the bad thing happened
+  flagDone: Record<string, boolean> // trigger already checked
   hints: number
   hintUse: Record<string, number>
   over: boolean
@@ -35,20 +35,21 @@ export interface Game {
 }
 export interface ExecResult { ask?: { persona: string; turns: ChatTurn[]; slot: Item & { k: 'res' } } }
 
-const sc = () => scenario()
+export const scn = (g: Game): Scenario => g.def.build()
+export const alertById = (g: Game, id: string): Alert | undefined => g.def.alerts.find((a) => a.id === id)
 
-export function newGame(mode: Mode): Game {
+export function newGame(mode: Mode, def: ShiftDef): Game {
   const g: Game = {
-    mode, clock: START, sel: null, decided: {}, pins: {}, actions: new Set(), log: [], hist: [], cmdHist: [],
-    arrived: new Set(), becDecided: false, bec: false, hints: 0, hintUse: {}, over: false, blocks: [], call: null, toasts: [],
+    def, mode, clock: def.start, sel: null, decided: {}, pins: {}, actions: new Set(), log: [], hist: [], cmdHist: [],
+    arrived: new Set(), flags: {}, flagDone: {}, hints: 0, hintUse: {}, over: false, blocks: [], call: null, toasts: [],
   }
-  for (const a of ALERTS) if (!a.late && a.at <= START) g.arrived.add(a.id)
+  for (const a of def.alerts) if (!a.late && a.at <= def.start) g.arrived.add(a.id)
   log(g, 'Shift started')
   return g
 }
 export function log(g: Game, m: string): void { g.log.unshift({ t: g.clock, m }) }
-export function visible(g: Game, e: Ev): boolean { return e.ts <= g.clock && (!e.cond || (e.cond === 'bec' && g.bec)) }
-export function evById(id: string): Ev | undefined { return sc().events.find((e) => e.id === id) }
+export function visible(g: Game, e: Ev): boolean { return e.ts <= g.clock && (!e.cond || !!g.flags[e.cond]) }
+export function evById(g: Game, id: string): Ev | undefined { return scn(g).events.find((e) => e.id === id) }
 
 /* ---------------- query language ---------------- */
 
@@ -115,7 +116,7 @@ export interface QueryResult { err?: string; rows: Ev[]; total: number; mode: 'r
 export function runQuery(g: Game, line: string): QueryResult {
   const parts = splitPipes(line)
   const tests = toks(parts[0]).map(compile)
-  let rows = sc().events.filter((e) => visible(g, e) && tests.every((t) => t(e)))
+  let rows = scn(g).events.filter((e) => visible(g, e) && tests.every((t) => t(e)))
   const total = rows.length
   let mode: 'raw' | 'table' | 'grid' = 'raw'
   let cols: string[] = []
@@ -164,27 +165,13 @@ export function runQuery(g: Game, line: string): QueryResult {
 
 /* ---------------- lookups ---------------- */
 
-const TI: Record<string, string> = {
-  [ATT]: 'AS64500 HostBulk LLC · Bucharest, RO · commercial hosting / VPS range\n23 abuse reports in the last 7 days (phishing, credential stuffing)\nNot a corporate network. Not a known consumer VPN provider.\nReputation: MALICIOUS',
-  [PHD]: 'Reputation: MALICIOUS · 31 of 90 engines flag it\nTyposquat of a Microsoft sign-in page (the "o" in "micros0ft" is a zero)\nMatches a credential-harvest kit fingerprint · first seen 03-14',
-  'brightpath-pay.co': 'Reputation: SUSPICIOUS · registered 4 days ago\nSending infrastructure for 6 other phishing campaigns this week\nOften used as a forwarding / drop address for stolen mail',
-  '203.0.113.11': 'Harlow & Finch corporate egress (internal address)',
-  '49.36.140.22': 'Consumer mobile ISP · Mumbai, IN · no abuse history',
-  '82.31.14.9': 'Residential broadband · Sheffield, GB · no abuse history',
-  'trade-expo-2026.eu': 'Reputation: CLEAN · small events site, registered 21 days ago, 3 visits from H&F',
-}
-export function tiLookup(x: string): string {
+export function tiLookup(g: Game, x: string): string {
   const k = x.toLowerCase().replace(/\[\.\]/g, '.')
-  if (TI[k]) return TI[k]
-  if (/^192\.0\.2\./.test(k)) return 'Range seen in ~1,900 abuse reports per day · generic internet scanner / credential-spray botnet · no targeted activity against H&F'
+  const it = g.def.intel
+  if (it.ti[k]) return it.ti[k]
+  for (const [re, txt] of it.tiRules ?? []) if (re.test(k)) return txt
   if (/^[a-f0-9]{32,64}$/.test(k)) return 'Hash not seen before · no detections'
   return 'No data. Not seen in any feed.'
-}
-const WHOIS: Record<string, string> = {
-  [PHD]: "Domain:      login-micros0ft-secure.com\nCreated:     03-14 (3 days ago)\nRegistrar:   privacy-protected\nNameserver:  cloudflare\nTLS cert:    Let's Encrypt, issued 03-14",
-  'brightpath-pay.co': 'Domain:      brightpath-pay.co\nCreated:     03-13 (4 days ago)\nRegistrar:   privacy-protected\nMX:          yes (receives mail)',
-  'trade-expo-2026.eu': 'Domain:      trade-expo-2026.eu\nCreated:     02-24 (21 days ago)\nRegistrant:  Expo Events Ltd (visible)\nMX:          yes',
-  'brightfreight.example': 'Domain:      brightfreight.example\nCreated:     2011\nRegistrant:  Bright Freight Ltd (existing H&F supplier)',
 }
 export function b64dec(s: string): string | null {
   try {
@@ -196,50 +183,33 @@ export function b64dec(s: string): string | null {
     return null
   }
 }
-// Fixed phone answers. When the local AI is available these are replaced by a
-// live conversation, but they stay the fallback so the shift always works.
-export const PHONE: Record<string, string> = {
-  'jenna.hart': 'Jenna Hart (desk 2214):\n"My phone kept buzzing around eight. I thought the app was glitching, so I tapped Approve to make it stop. Did I do something wrong?"\nShe did not start a sign-in from Romania. She was at her desk. She also remembers clicking a remittance link earlier and typing her password into "the Microsoft page".',
-  'priya.singh': 'Priya Singh:\n"Yes that was me. I landed in Mumbai this morning for the partner conference and I am on my work laptop."',
-  'aisha.khan': 'Aisha Khan:\n"I clicked the remittance link but the page looked off, so I closed it. I did not type anything."',
-  'marcus.o': 'Marcus O.:\n"Opened it, thought the address looked odd, closed it. Nothing typed."',
-  'david.cole': 'David Cole:\n"I am not running anything special. My machine did slow down for a minute around half eight."',
-  'adm.collins': 'Adam Collins (infra):\n"Oh no. I picked Domain Admins from the dropdown instead of Backup Operators. Can you get it reverted?"',
-}
-const BADGE: Record<string, string> = { 'jenna.hart': 'Main entrance IN 07:32 · no OUT recorded · swipe at finance floor 07:34. Physically in the building.', 'priya.singh': 'No badge activity for 3 days (travelling).' }
-const HR: Record<string, string> = {
-  'jenna.hart': 'Accounts Payable · full-time · no leave booked · line manager: finance director.',
-  'priya.singh': 'Sales Executive · APPROVED business travel Sheffield to Mumbai 03-16 to 03-21 (partner conference) · company laptop issued.',
-  'adm.collins': 'Infrastructure admin · joined 2019 · no concerns on file.',
-}
-const TICKET: Record<string, string> = { 'chg-2240': 'CHG-2240 · Approved · requester adm.collins\nScope: add svc-backup2 to BACKUP OPERATORS on DC01\nWindow: 09:30 - 10:30 today\nNotes: needed for new backup agent. No domain-level privileges requested.' }
-function askIT(q: string): string {
-  if (/sccm|inventory|powershell|encod|8:3|ccm/i.test(q)) return 'Platform team: SCCM software inventory runs daily at 08:30 on every managed workstation. The encoded script is the standard CCM inventory export.'
-  if (/vpn|spray|192\.0\.2|brute/i.test(q)) return 'Network team: that range hits the VPN every few days. MFA is enforced and nothing has got through historically.'
-  if (/jenna|rule|forward|consent|docsync/i.test(q)) return 'Helpdesk: no ticket from Jenna today. DocSyncPro is not on our approved app list.'
-  return 'IT: not sure, can you raise a ticket?'
-}
 
 export const COSTS: Record<string, number> = {
   ti: 1, whois: 1, b64: 0, phone: 5, badge: 3, hr: 3, 'ask-it': 3, ticket: 2, 'revoke-sessions': 2, 'reset-password': 2, 'disable-user': 2,
   'delete-rule': 2, 'revoke-consent': 2, 'block-domain': 2, 'block-ip': 2, 'purge-mail': 3, isolate: 2, 'remove-group': 2, 'notify-finance': 3,
+  notify: 3, snapshot: 3, 'restrict-access': 2, 'disable-key': 2, 'delete-account': 2, terminate: 2, lock: 2, 'delete-file': 2, 'rotate-secret': 3,
   hint: 0, help: 0, fields: 0, alerts: 0, clear: 0, hangup: 0,
 }
-export const HELP = `SEARCH     source=entra user=jenna.hart result=success
+export function helpText(def: ShiftDef): string {
+  return `SEARCH     source=entra user=jenna.hart result=success
            key=value · key!=value · wildcards (*) · bytes_out>400 · bare words match anywhere
            earliest=08:00 latest=08:30   (today only)
 PIPES      | sort -time | head 20 | tail 5 | table time,user,ip | dedup ip
            | stats count by ip | top domain
-SOURCES    ${Object.keys(FIELDS).join(' · ')}
+SOURCES    ${Object.keys(def.fields).join(' · ')}
            fields <source>  lists the field names
 LOOKUPS    ti <ip|domain|hash>   whois <domain>   b64 <string>
            phone <user>   badge <user>   hr <user>   ask-it <question>   ticket <id>
 ACTIONS    revoke-sessions <user> · reset-password <user> · disable-user <user>
-           delete-rule <user> · revoke-consent <user> <app>
+           restrict-access <user> · delete-rule <user> · revoke-consent <user> <app>
            block-domain <domain> · block-ip <ip|cidr> · purge-mail <subject text>
-           isolate <host> · remove-group <account> <group> · notify-finance
+           isolate <host> · snapshot <host> · delete-file <host> <path>
+           remove-group <account> <group> · delete-account <name>
+           disable-key <id> · rotate-secret <name> · terminate <resource> · lock <resource>
+           notify <finance|hr|legal|dpo|ir-lead|vendor|management>
 OTHER      alerts · hint (training only) · hangup (end a phone call) · clear
 Every search or lookup costs shift time. Click any log line to pin it as evidence for the selected alert.`
+}
 
 /* ---------------- running a command ---------------- */
 
@@ -291,26 +261,28 @@ export function exec(g: Game, rawLine: string, aiReady: boolean): ExecResult {
 function mkBlock(cmd: string, cost: number): Block { return { cmd, cost, items: [] } }
 const msg = (b: Block, t: string, cls?: 'ok' | 'bad' | 'warn') => b.items.push({ k: 'msg', t, cls })
 const res = (b: Block, t: string) => b.items.push({ k: 'res', t })
+const userOf = (g: Game, n: string) => g.def.users.find((u) => u.n === n.toLowerCase())
 
 function runCmd(g: Game, b: Block, c: string, rest: string, w: string[], aiReady: boolean): ExecResult {
   const arg = w[1] || ''
+  const it = g.def.intel
   switch (c) {
-    case 'help': res(b, HELP); break
+    case 'help': res(b, helpText(g.def)); break
     case 'clear': break
     case 'hangup': msg(b, 'You are not on a call.', 'warn'); break
     case 'alerts': {
-      const open = ALERTS.filter((a) => g.arrived.has(a.id) && !g.decided[a.id])
+      const open = g.def.alerts.filter((a) => g.arrived.has(a.id) && !g.decided[a.id])
       res(b, open.length ? open.map((a) => `${a.id}  ${a.title}  [${a.ent}]`).join('\n') : 'No open alerts.')
       break
     }
     case 'fields': {
-      const s = arg.toLowerCase() as Src
-      if (FIELDS[s]) res(b, `${s} (${SRCDESC[s]})\n${FIELDS[s].split(' ').join(', ')}\nPlus the implicit fields: source, id`)
-      else res(b, (Object.keys(FIELDS) as Src[]).map((k) => `${k.padEnd(11)}${SRCDESC[k]}\n${' '.repeat(11)}${FIELDS[k]}`).join('\n'))
+      const s = arg.toLowerCase()
+      if (g.def.fields[s]) res(b, `${s} (${g.def.srcdesc[s]})\n${g.def.fields[s].split(' ').join(', ')}\nPlus the implicit fields: source, id`)
+      else res(b, Object.keys(g.def.fields).map((k) => `${k.padEnd(11)}${g.def.srcdesc[k]}\n${' '.repeat(11)}${g.def.fields[k]}`).join('\n'))
       break
     }
-    case 'ti': if (!arg) { msg(b, 'Usage: ti <ip|domain|hash>', 'bad'); b.cost = 0 } else res(b, tiLookup(arg)); break
-    case 'whois': if (!arg) { msg(b, 'Usage: whois <domain>', 'bad'); b.cost = 0 } else res(b, WHOIS[arg.toLowerCase().replace(/\[\.\]/g, '.')] || `No record found for ${arg}.`); break
+    case 'ti': if (!arg) { msg(b, 'Usage: ti <ip|domain|hash>', 'bad'); b.cost = 0 } else res(b, tiLookup(g, arg)); break
+    case 'whois': if (!arg) { msg(b, 'Usage: whois <domain>', 'bad'); b.cost = 0 } else res(b, it.whois[arg.toLowerCase().replace(/\[\.\]/g, '.')] || `No record found for ${arg}.`); break
     case 'b64': {
       if (!rest) { msg(b, 'Usage: b64 <base64 string>', 'bad'); break }
       const d = b64dec(rest.replace(/^-enc\w*\s+/i, ''))
@@ -319,29 +291,30 @@ function runCmd(g: Game, b: Block, c: string, rest: string, w: string[], aiReady
     }
     case 'phone': {
       const u = arg.toLowerCase()
-      if (!BY_NAME[u]) { res(b, `Unknown user "${arg}".`); break }
-      if (u === 'adm.collins' && g.clock < hm(9, 45)) { res(b, 'Adam Collins is in a meeting, no answer.'); break }
-      if (aiReady && CALLABLE.includes(u)) {
+      if (!userOf(g, u) && !(u in it.phone)) { res(b, `Unknown user "${arg}".`); break }
+      const busy = it.phoneBusy?.(u, g.clock)
+      if (busy) { res(b, busy); break }
+      if (aiReady && g.def.callable.includes(u)) {
         g.call = { persona: u, turns: [] }
         msg(b, `Calling ${u}… connected. Type what you want to ask, in your own words. Each question costs a minute. Type "hangup" to end the call.`, 'ok')
         msg(b, 'This person is played by your local AI. They only know what they would really know.', undefined)
         break
       }
-      res(b, PHONE[u] || `${u}: straight to voicemail.`)
+      res(b, it.phone[u] || `${u}: straight to voicemail.`)
       break
     }
-    case 'badge': { const u = arg.toLowerCase(); res(b, BADGE[u] || (BY_NAME[u] ? `${u}: normal swipe pattern, nothing unusual.` : 'Unknown user.')); break }
-    case 'hr': { const u = arg.toLowerCase(); res(b, HR[u] || (BY_NAME[u] ? `${BY_NAME[u].dept} · no flags on file.` : 'Unknown user.')); break }
-    case 'ask-it': res(b, askIT(rest)); break
-    case 'ticket': res(b, TICKET[arg.toLowerCase()] || `Ticket ${arg} not found.`); break
+    case 'badge': { const u = arg.toLowerCase(); res(b, it.badge[u] || (userOf(g, u) ? `${u}: normal swipe pattern, nothing unusual.` : 'Unknown user.')); break }
+    case 'hr': { const u = arg.toLowerCase(); res(b, it.hr[u] || (userOf(g, u) ? `${userOf(g, u)!.dept} · no flags on file.` : 'Unknown user.')); break }
+    case 'ask-it': res(b, it.askIt(rest)); break
+    case 'ticket': res(b, it.tickets[arg.toLowerCase()] || `Ticket ${arg} not found.`); break
     case 'hint': {
       if (g.mode !== 'training') { msg(b, 'Hints are disabled in exam mode.', 'warn'); break }
       if (!g.sel) { msg(b, 'Select an alert first.', 'warn'); break }
-      const h = ALERT_BY_ID[g.sel].hints
+      const h = alertById(g, g.sel)?.hints ?? []
       const used = g.hintUse[g.sel] ?? 0
       g.hintUse[g.sel] = used + 1
       g.hints++
-      res(b, `HINT (${g.sel}): ${h[Math.min(used, h.length - 1)]}\n(-5 points)`)
+      res(b, `HINT (${g.sel}): ${h[Math.min(used, h.length - 1)] ?? 'No hint for this one.'}\n(-5 points)`)
       break
     }
     default: action(g, b, c, rest, w)
@@ -353,18 +326,22 @@ function action(g: Game, b: Block, c: string, rest: string, w: string[]): void {
   const a = (w[1] || '').toLowerCase()
   const ok = (t: string, key: string) => { g.actions.add(key); log(g, `Action: ${key}`); msg(b, t, 'ok') }
   const bad = (t: string) => { msg(b, t, 'bad'); b.cost = 0 }
+  const tail = (n: number) => w.slice(n).join(' ')
   if (c === 'revoke-sessions' || c === 'reset-password' || c === 'disable-user') {
-    if (!BY_NAME[a]) return bad(`Unknown user "${w[1] ?? ''}".`)
+    if (!userOf(g, a) && !g.def.intel.phone[a] && !/^(krbtgt|svc[._-]|msol_|adm\.)/.test(a)) return bad(`Unknown user "${w[1] ?? ''}".`)
     const t = { 'revoke-sessions': `All refresh tokens and sessions revoked for ${a}.`, 'reset-password': `Password reset for ${a}. User must set a new one at next sign-in.`, 'disable-user': `Account ${a} disabled.` }[c]
-    ok(t, `${c} ${a}`)
+    ok(t as string, `${c} ${a}`)
+  } else if (c === 'restrict-access') {
+    if (!a) return bad('Usage: restrict-access <user>')
+    ok(`Download, USB and external-sharing rights removed for ${a}. The account still works and nothing is deleted.`, `${c} ${a}`)
   } else if (c === 'delete-rule') {
-    if (!BY_NAME[a]) return bad('Unknown user.')
-    const has = sc().events.some((e) => e.src === 'exchange' && e.f.user === a && e.key === 'e_rule' && visible(g, e))
+    if (!a) return bad('Unknown user.')
+    const has = scn(g).events.some((e) => e.src === 'exchange' && e.f.user === a && e.key === 'e_rule' && visible(g, e))
     ok(has ? `Removed 1 suspicious inbox rule ("." forwarding to external address) from ${a}.` : `No suspicious rules found for ${a}. Nothing removed.`, `${c} ${a}`)
   } else if (c === 'revoke-consent') {
-    const app = w.slice(2).join(' ').toLowerCase()
-    if (!BY_NAME[a] || !app) return bad('Usage: revoke-consent <user> <app>')
-    ok(`Consent for app "${w.slice(2).join(' ')}" revoked for ${a}.`, `${c} ${a} ${app}`)
+    const app = tail(2).toLowerCase()
+    if (!a || !app) return bad('Usage: revoke-consent <user> <app>')
+    ok(`Consent for app "${tail(2)}" revoked for ${a}.`, `${c} ${a} ${app}`)
   } else if (c === 'block-domain') {
     const d = (w[1] || '').toLowerCase().replace(/\[\.\]/g, '.')
     if (!d) return bad('Usage: block-domain <domain>')
@@ -372,20 +349,44 @@ function action(g: Game, b: Block, c: string, rest: string, w: string[]): void {
   } else if (c === 'block-ip') {
     const d = (w[1] || '').toLowerCase()
     if (!d) return bad('Usage: block-ip <ip|cidr>')
-    ok(d === '203.0.113.11' ? `Blocked ${d} at the perimeter. WARNING: this is the corporate egress address. Staff report they cannot reach Microsoft 365.` : `Blocked ${d} at the firewall.`, `${c} ${d}`)
+    const warn = g.def.intel.protectedIps?.[d]
+    ok(warn ? `Blocked ${d} at the perimeter. WARNING: ${warn}` : `Blocked ${d} at the firewall.`, `${c} ${d}`)
   } else if (c === 'purge-mail') {
     const t = rest.toLowerCase()
     if (!t) return bad('Usage: purge-mail <subject text>')
-    const n = sc().events.filter((e) => e.src === 'mail' && visible(g, e) && e.f.dir === 'inbound' && String(e.f.subj).toLowerCase().includes(t) && e.f.verdict === 'delivered').length
+    const n = scn(g).events.filter((e) => e.src === 'mail' && visible(g, e) && e.f.dir === 'inbound' && String(e.f.subj).toLowerCase().includes(t) && e.f.verdict === 'delivered').length
     ok(`Searched all mailboxes for subject containing "${rest}". Soft-deleted ${n} message${n === 1 ? '' : 's'}.`, `purge-mail ${t}`)
   } else if (c === 'isolate') {
-    const h = (w[1] || '').toLowerCase()
-    if (!h) return bad('Usage: isolate <host>')
-    ok(`Host ${w[1]} network-isolated by EDR.`, `isolate ${h}`)
+    if (!a) return bad('Usage: isolate <host>')
+    ok(`Host ${w[1]} network-isolated by EDR.`, `isolate ${a}`)
+  } else if (c === 'snapshot') {
+    if (!a) return bad('Usage: snapshot <host>')
+    ok(`Forensic snapshot (disk and memory) of ${w[1]} taken and stored read-only.`, `snapshot ${a}`)
+  } else if (c === 'delete-file') {
+    if (!a || !w[2]) return bad('Usage: delete-file <host> <path>')
+    ok(`Deleted ${w[2]} on ${w[1]}.`, `delete-file ${a} ${tail(2).toLowerCase()}`)
   } else if (c === 'remove-group') {
-    const g2 = w.slice(2).join(' ').toLowerCase()
+    const g2 = tail(2).toLowerCase()
     if (!a || !g2) return bad('Usage: remove-group <account> <group>')
-    ok(`Removed ${w[1]} from ${w.slice(2).join(' ')}.`, `remove-group ${a} ${g2}`)
+    ok(`Removed ${w[1]} from ${tail(2)}.`, `remove-group ${a} ${g2}`)
+  } else if (c === 'delete-account') {
+    if (!a) return bad('Usage: delete-account <name>')
+    ok(`Account ${w[1]} deleted, with its keys and sessions.`, `delete-account ${a}`)
+  } else if (c === 'disable-key') {
+    if (!a) return bad('Usage: disable-key <access key id>')
+    ok(`Access key ${w[1]} deactivated.`, `disable-key ${a}`)
+  } else if (c === 'rotate-secret') {
+    if (!a) return bad('Usage: rotate-secret <name>')
+    ok(`Secret "${tail(1)}" rotated. Dependent services will pick up the new value.`, `rotate-secret ${tail(1).toLowerCase()}`)
+  } else if (c === 'terminate') {
+    if (!a) return bad('Usage: terminate <resource or fleet tag>')
+    ok(`Resources matching "${tail(1)}" terminated.`, `terminate ${tail(1).toLowerCase()}`)
+  } else if (c === 'lock') {
+    if (!a) return bad('Usage: lock <resource>')
+    ok(`${w[1]} locked: new access is denied until it is reviewed.`, `lock ${a}`)
+  } else if (c === 'notify') {
+    if (!a) return bad('Usage: notify <finance|hr|legal|dpo|ir-lead|vendor|management>')
+    ok(`${w[1]} has been told and will follow up.`, `notify ${a}`)
   } else if (c === 'notify-finance') {
     ok('Finance director and AP team notified: do not act on any "updated bank details" emails; verify supplier changes by phone.', 'notify-finance')
   }
@@ -396,19 +397,19 @@ function action(g: Game, b: Block, c: string, rest: string, w: string[]): void {
 export function advance(g: Game, mins: number): void {
   for (let i = 0; i < mins && !g.over; i++) {
     g.clock += 60
-    if (!g.becDecided && g.clock >= hm(9, 15)) {
-      g.becDecided = true
-      const A = g.actions
-      const contained = (A.has('revoke-sessions jenna.hart') && A.has('reset-password jenna.hart')) || A.has('disable-user jenna.hart')
-      g.bec = !contained
-      if (contained) log(g, "Jenna's account contained before 09:15")
+    for (const t of g.def.triggers) {
+      if (g.flagDone[t.flag] || g.clock < t.at) continue
+      g.flagDone[t.flag] = true
+      const contained = t.contained(g)
+      g.flags[t.flag] = !contained
+      if (contained) log(g, t.okLog)
     }
-    for (const a of ALERTS) {
+    for (const a of g.def.alerts) {
       if (g.arrived.has(a.id)) continue
-      if (a.late === 'bec' && !g.bec) continue
+      if (a.late && !g.flags[a.late]) continue
       if (a.at <= g.clock) { g.arrived.add(a.id); log(g, `New alert ${a.id}: ${a.title}`); g.toasts.push(`New alert: ${a.title}`) }
     }
-    if (g.clock >= END) { endShift(g); break }
+    if (g.clock >= g.def.end) { endShift(g); break }
   }
 }
 export function endShift(g: Game): void { g.over = true; g.call = null }
@@ -425,27 +426,31 @@ export function togglePin(g: Game, id: string): boolean {
 export function isPinned(g: Game, id: string): boolean { return Object.values(g.pins).some((p) => p.includes(id)) }
 export function pinnedKeys(g: Game): Set<string> {
   const s = new Set<string>()
-  for (const p of Object.values(g.pins)) for (const id of p) { const e = evById(id); if (e?.key) s.add(e.key) }
+  for (const p of Object.values(g.pins)) for (const id of p) { const e = evById(g, id); if (e?.key) s.add(e.key) }
   return s
 }
-const CHK: Record<string, (g: Game) => boolean> = {
-  c_vpn: (g) => g.hist.some((h) => /source=vpn/i.test(h) && (/result=(success|\*|"?s)/i.test(h) || (/stats|top/i.test(h) && /result/i.test(h)))),
-  c_priya: (g) => g.hist.some((h) => /^(hr|phone)\s+priya\.singh/i.test(h)),
-  c_decode: (g) => g.hist.some((h) => /^b64\s+/i.test(h) || (/source=edr/i.test(h) && /-enc|powershell/i.test(h) && /stats|top|dedup/i.test(h))),
-  c_ticket: (g) => g.hist.some((h) => /^ticket\s+chg-2240/i.test(h)),
-}
-export function reqMet(g: Game, r: string): boolean { return r.startsWith('c_') ? !!CHK[r]?.(g) : pinnedKeys(g).has(r) }
+export function reqMet(g: Game, r: string): boolean { return r.startsWith('c_') ? !!g.def.checks[r]?.(g) : pinnedKeys(g).has(r) }
 
 export function submitVerdict(g: Game, alertId: string, v: Verdict, note: string): void {
   if (g.decided[alertId]) return
   g.decided[alertId] = { v, t: g.clock, note }
   log(g, `${alertId} decided: ${VLABEL[v]}`)
   if (g.mode === 'training') {
-    const a = ALERT_BY_ID[alertId]
+    const a = alertById(g, alertId)
+    if (!a) return
     const p = gradeAlert(g, a).pts
     g.toasts.push(`${alertId}: ${v === a.best ? 'correct' : 'not the best call'} (${p >= 0 ? '+' : ''}${p})`)
   }
 }
+
+export const VERDICTS: [Verdict, string][] = [
+  ['incident', 'Escalate: security incident'],
+  ['fp', 'Close: false positive (rule was wrong)'],
+  ['benign', 'Close: expected activity (rule right, nothing bad)'],
+  ['it', 'Hand to IT / Ops'],
+  ['insider', 'Escalate: HR + insider risk'],
+]
+export const VLABEL: Record<string, string> = Object.fromEntries(VERDICTS)
 
 export interface AlertGrade { pts: number; notes: string[]; found: string[]; miss: string[] }
 export function gradeAlert(g: Game, a: Alert): AlertGrade {
@@ -465,63 +470,33 @@ export function gradeAlert(g: Game, a: Alert): AlertGrade {
   return out
 }
 
-interface Containment { label: string; pts: number; t: (A: Set<string>) => boolean }
-export const CONTAIN: Containment[] = [
-  { label: "Revoke Jenna's sessions", pts: 40, t: (A) => A.has('revoke-sessions jenna.hart') },
-  { label: "Reset Jenna's password", pts: 40, t: (A) => A.has('reset-password jenna.hart') },
-  { label: 'Delete the hidden inbox rule', pts: 40, t: (A) => A.has('delete-rule jenna.hart') },
-  { label: 'Revoke the DocSyncPro consent', pts: 40, t: (A) => A.has('revoke-consent jenna.hart docsyncpro') },
-  { label: `Block ${PHD}`, pts: 30, t: (A) => A.has(`block-domain ${PHD}`) },
-  { label: 'Block brightpath-pay.co', pts: 30, t: (A) => A.has('block-domain brightpath-pay.co') },
-  { label: 'Purge the phishing email from all mailboxes', pts: 40, t: (A) => A.has('purge-mail remittance advice 4471') },
-  { label: `Block ${ATT}`, pts: 20, t: (A) => A.has(`block-ip ${ATT}`) },
-  { label: 'Remove svc-backup2 from Domain Admins', pts: 40, t: (A) => A.has('remove-group svc-backup2 domain admins') },
-  { label: 'Block the 192.0.2.0/24 spray range', pts: 15, t: (A) => A.has('block-ip 192.0.2.0/24') },
-]
-export const WRONG: { label: string; pts: number; t: (A: Set<string>) => boolean }[] = [
-  { label: 'Isolated FIN-WS-014 (running legitimate SCCM)', pts: -50, t: (A) => A.has('isolate fin-ws-014') },
-  { label: 'Disabled priya.singh (legitimate traveller)', pts: -50, t: (A) => A.has('disable-user priya.singh') },
-  { label: 'Blocked the corporate egress IP 203.0.113.11 (outage)', pts: -80, t: (A) => A.has('block-ip 203.0.113.11') },
-  { label: 'Disabled adm.collins on a hunch', pts: -40, t: (A) => A.has('disable-user adm.collins') },
-  { label: 'Isolated a host with no evidence against it', pts: -30, t: (A) => [...A].some((x) => x.startsWith('isolate ') && !['isolate fin-ws-019', 'isolate fin-ws-014'].includes(x)) },
-]
 export interface ContainGrade { items: { label: string; pts: number; done: boolean }[]; bad: { label: string; pts: number }[]; pts: number }
 export function gradeContain(g: Game): ContainGrade {
-  const items = CONTAIN.map((c) => ({ label: c.label, pts: c.pts, done: c.t(g.actions) }))
-  const bad = WRONG.filter((w) => w.t(g.actions))
-  let pts = items.filter((i) => i.done).reduce((s, i) => s + i.pts, 0) + bad.reduce((s, w) => s + w.pts, 0)
-  if (g.bec) {
-    const done = g.actions.has('notify-finance')
-    if (done) pts += 30
-    items.push({ label: 'Notify Finance about the fraudulent bank-details email', pts: 30, done })
-  }
+  const items = g.def.contain.filter((c) => !c.when || c.when(g)).map((c) => ({ label: c.label, pts: c.pts, done: c.t(g) }))
+  const bad = g.def.wrong.filter((w) => w.t(g))
+  const pts = items.filter((i) => i.done).reduce((s, i) => s + i.pts, 0) + bad.reduce((s, w) => s + w.pts, 0)
   return { items, bad, pts }
 }
 export function total(g: Game, final: boolean): number {
   let t = 0
-  for (const a of ALERTS) { const gr = gradeAlert(g, a); if (g.decided[a.id] || final) t += gr.pts }
+  for (const a of g.def.alerts) { const gr = gradeAlert(g, a); if (g.decided[a.id] || final) t += gr.pts }
   t += gradeContain(g).pts - 5 * g.hints
-  if (g.bec) t -= 100
+  for (const tr of g.def.triggers) if (g.flags[tr.flag]) t -= tr.penalty
   return t
 }
 export function maxScore(g: Game): number {
   let m = 0
-  for (const a of ALERTS) { if (a.late === 'bec' && !g.bec) continue; m += 100 + 25 * a.req.length }
-  return m + CONTAIN.reduce((s, c) => s + c.pts, 0)
+  for (const a of g.def.alerts) { if (a.late && !g.flags[a.late]) continue; m += 100 + 25 * a.req.length }
+  return m + g.def.contain.filter((c) => !c.when || c.when(g)).reduce((s, c) => s + c.pts, 0)
 }
-export function openAlerts(g: Game): Alert[] { return ALERTS.filter((a) => g.arrived.has(a.id) && !g.decided[a.id]) }
-
-export interface TimelineRow { at: number; text: string; ttp: string; found: boolean }
-export function timeline(g: Game): TimelineRow[] {
-  const k = pinnedKeys(g)
-  const rows: TimelineRow[] = [
-    { at: hm(7, 41), text: 'Phishing email "Remittance advice 4471" delivered to 10 Finance users', ttp: 'T1566.002 Spearphishing link', found: k.has('e_mail_deliv') },
-    { at: hm(7, 48), text: 'Jenna types her password into a fake Microsoft sign-in page', ttp: 'T1056.003 / T1078 Valid accounts', found: k.has('e_post') },
-    { at: hm(8, 3), text: 'Attacker logs in with the stolen password and sends 11 MFA pushes', ttp: 'T1621 MFA request generation', found: k.has('e_office_signin') || k.has('e_success_foreign') },
-    { at: hm(8, 13), text: 'Jenna approves a push. Attacker is in from a Romanian hosting IP', ttp: 'T1078.004 Cloud accounts', found: k.has('e_success_foreign') },
-    { at: hm(8, 19), text: 'Hidden inbox rule forwards finance mail to an external address', ttp: 'T1114.003 Email forwarding rule', found: k.has('e_rule') },
-    { at: hm(8, 22), text: 'Malicious OAuth app "DocSyncPro" granted persistent mail and file access', ttp: 'T1528 Steal application access token', found: k.has('e_consent') || g.actions.has('revoke-consent jenna.hart docsyncpro') },
-  ]
-  if (g.bec) rows.push({ at: hm(9, 17), text: 'Fraudulent "updated bank details" email sent to a real supplier', ttp: 'T1657 Financial theft (BEC)', found: k.has('e_bec') })
-  return rows
+export function openAlerts(g: Game): Alert[] { return g.def.alerts.filter((a) => g.arrived.has(a.id) && !g.decided[a.id]) }
+export function noteFacts(g: Game, a: Alert): string {
+  return [
+    `Alert: ${a.title} (${a.ent}).`,
+    `The correct call was: ${VLABEL[a.best]}.`,
+    `What really happened: ${a.why}`,
+    `A good handover note covers: ${a.req.map((r) => g.def.evd[r]).join('; ')}.`,
+    g.def.noteTail(a),
+  ].join('\n')
 }
+export function timeline(g: Game): TimelineRow[] { return g.def.timeline(pinnedKeys(g), g) }

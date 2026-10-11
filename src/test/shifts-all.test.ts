@@ -1,0 +1,96 @@
+// Checks that apply to every shift in the catalogue, so a new shift file is
+// held to the same bar: unique ids, resolvable keys, only documentation IPs,
+// a scripted perfect run that scores well, and doing nothing that scores badly.
+import { describe, expect, it } from 'vitest'
+import { SHIFTS, LEVELS } from '../shift'
+import { advance, exec, gradeAlert, gradeContain, maxScore, newGame, submitVerdict, togglePin, total, type Game } from '../shift/engine'
+import type { ShiftDef } from '../shift/types'
+
+const DOC_IP = /^(203\.0\.113\.|198\.51\.100\.|192\.0\.2\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|82\.31\.14\.9$|49\.36\.140\.22$|127\.)/
+
+function perfect(def: ShiftDef): Game {
+  const g = newGame('exam', def)
+  const sc = def.build()
+  const todo = new Map(def.solution.verdicts)
+  const decide = () => {
+    for (const a of def.alerts) {
+      if (!g.arrived.has(a.id) || g.decided[a.id] || !todo.has(a.id)) continue
+      g.sel = a.id
+      for (const k of def.solution.pins[a.id] ?? []) { const e = sc.byKey[k]; if (e) togglePin(g, e.id) }
+      submitVerdict(g, a.id, todo.get(a.id)!, 'Handover: what happened, what I found and what happens next.')
+    }
+  }
+  decide()
+  for (const c of def.solution.cmds) { exec(g, c, false); decide() }
+  while (!g.over && g.clock < def.end - 60) { advance(g, 1); decide() }
+  g.sel = null
+  return g
+}
+
+describe('catalogue', () => {
+  it('has ten shifts across all five levels, easiest first, with unique ids', () => {
+    expect(SHIFTS).toHaveLength(10)
+    expect(new Set(SHIFTS.map((s) => s.id)).size).toBe(10)
+    const idx = SHIFTS.map((s) => LEVELS.indexOf(s.level))
+    expect([...idx].sort((a, b) => a - b)).toEqual(idx)
+    for (const l of LEVELS) expect(SHIFTS.some((s) => s.level === l), l).toBe(true)
+  })
+})
+
+describe.each(SHIFTS.map((s) => [s.id, s] as const))('%s', (_id, def) => {
+  const sc = def.build()
+  it('has a coherent scenario', () => {
+    expect(new Set(sc.events.map((e) => e.id)).size).toBe(sc.events.length)
+    expect(sc.events.length).toBeGreaterThan(300)
+    const srcs = new Set(sc.events.map((e) => e.src))
+    for (const s of srcs) expect(def.fields[s], `source ${s} has no field list`).toBeTruthy()
+    for (const e of sc.events) for (const k of Object.keys(e.f)) expect(def.fields[e.src].split(' ').includes(k), `${e.src}.${k}`).toBe(true)
+    for (const e of sc.events) { const ip = String(e.f.ip ?? ''); if (ip) expect(DOC_IP.test(ip), ip).toBe(true) }
+  })
+  it('wires alerts, evidence and tags together', () => {
+    const ids = def.alerts.map((a) => a.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    for (const a of def.alerts) {
+      expect(sc.events.some((e) => e.tag === a.raw), `${a.id} raw tag ${a.raw}`).toBe(true)
+      expect(a.hints.length, a.id).toBeGreaterThan(0)
+      expect(a.sla).toBeGreaterThan(0)
+      for (const r of a.req) {
+        expect(def.evd[r], `${a.id} requirement ${r} has no description`).toBeTruthy()
+        if (r.startsWith('c_')) expect(def.checks[r], `check ${r}`).toBeTypeOf('function')
+        else expect(sc.byKey[r], `evidence key ${r}`).toBeTruthy()
+      }
+      if (a.late) expect(def.triggers.some((t) => t.flag === a.late), `${a.id} late flag`).toBe(true)
+    }
+    for (const e of sc.events) if (e.cond) expect(def.triggers.some((t) => t.flag === e.cond), `event cond ${e.cond}`).toBe(true)
+    expect(def.alerts.filter((a) => a.best === 'incident').length).toBeGreaterThan(0)
+    expect(def.alerts.some((a) => a.best !== 'incident')).toBe(true)
+    for (const [id] of def.solution.verdicts) expect(ids).toContain(id)
+  })
+  it('only lets you phone people it can play', () => {
+    for (const p of def.callable) expect(def.intel.phone[p] ?? def.users.find((u) => u.n === p), p).toBeTruthy()
+  })
+  it('a scripted perfect run gets every call right and a high score', () => {
+    const g = perfect(def)
+    for (const [id, v] of def.solution.verdicts) expect(g.decided[id]?.v, id).toBe(v)
+    for (const a of def.alerts) if (!(a.late && !g.flags[a.late])) expect(g.decided[a.id]?.v ?? 'none', a.id).toBe(a.best)
+    expect(gradeContain(g).bad, 'perfect play should do nothing harmful').toEqual([])
+    for (const t of def.triggers) expect(g.flags[t.flag], `trigger ${t.flag} should be prevented`).toBe(false)
+    const pct = total(g, true) / maxScore(g)
+    expect(pct).toBeGreaterThan(0.85)
+    for (const a of def.alerts) if (g.decided[a.id]) expect(gradeAlert(g, a).miss, `${a.id} evidence`).toEqual([])
+  })
+  it('doing nothing is a clear failure', () => {
+    const g = newGame('exam', def)
+    advance(g, 600)
+    expect(g.over).toBe(true)
+    expect(total(g, true)).toBeLessThan(0)
+  })
+  it('allowing the triggers to fire scores worse than preventing them', () => {
+    if (!def.triggers.length) return
+    const good = perfect(def)
+    const idle = newGame('exam', def)
+    advance(idle, 600)
+    for (const t of def.triggers) expect(idle.flags[t.flag], t.flag).toBe(true)
+    expect(total(idle, true)).toBeLessThan(total(good, true))
+  })
+})
