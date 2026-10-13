@@ -1,0 +1,38 @@
+// Extra alerts for shift 8 (Fenwick Pay, 10:30-13:00).
+import { hm, m } from '../common'
+import type { Noise } from '../noise'
+
+export const noise8: Noise[] = [
+  { id: 'Q801', title: 'Registry: typosquat advisory for "lodahs"', sev: 'med', src: 'Package registry', ent: 'lodahs', at: hm(10, 50), sla: m(90),
+    rule: 'Advisory feed lists a package name close to one you depend on.',
+    kv: [['Advisory', 'typosquat of lodash'], ['Package', 'lodahs'], ['In your lockfile', 'no']],
+    best: 'benign', alt: { fp: 60 }, evText: 'The advisory and the absence from your dependencies',
+    events: [{ src: 'registry', t: hm(10, 46, 30), f: { pkg: 'lodahs', version: '1.0.2', event: 'advisory', publisher: 'unknown-user-7731', detail: 'typosquat of lodash, removed from registry' } }],
+    ask: [/lodahs|lodash|typo/i, 'Platform: we use lodash, not lodahs. The lockfile has been clean since the audit in March.'],
+    why: 'The malicious look-alike exists, but nothing in Fenwick’s lockfile or CI pulled it. Note it for the watchlist and move on. The real compromise is in a package you do use.',
+    hints: ['Search ci and registry for the package name. Did any build install it?'] },
+  { id: 'Q802', title: 'Git: force-push to a feature branch', sev: 'med', src: 'Source control', ent: 'payments-api', at: hm(11, 15), sla: m(90),
+    rule: 'History rewritten with a force-push.',
+    kv: [['User', 'joe.m'], ['Repo', 'payments-api'], ['Ref', 'refs/heads/joe/refactor-retries'], ['Protected', 'no']],
+    best: 'benign', alt: { fp: 70 }, evText: 'The force-push to the developer’s own feature branch',
+    events: [{ src: 'git', t: hm(11, 11, 4), f: { user: 'joe.m', repo: 'payments-api', event: 'push --force', ref: 'refs/heads/joe/refactor-retries', ip: '203.0.113.90', detail: 'rebase onto main' } }],
+    why: 'A developer rebasing his own unprotected feature branch from the office. Force-pushes to main or a release tag would be the worry.',
+    hints: ['Which ref was it? Is it protected?'] },
+  { id: 'Q803', title: 'CI: job pulled a container image from an unfamiliar registry', sev: 'med', src: 'CI', ent: 'payments-api', at: hm(11, 35), sla: m(75),
+    rule: 'Build step pulled an image from a registry not on the allow-list.',
+    kv: [['Repo', 'payments-api'], ['Job', 'integration-tests'], ['Image', 'ghcr.io/testcontainers/ryuk:0.7']],
+    best: 'it', alt: { benign: 70 }, evText: 'The test-container image pulled from GitHub’s registry',
+    events: [{ src: 'ci', t: hm(11, 30, 12), f: { repo: 'payments-api', job: 'integration-tests', step: 'pull image', event: 'docker pull', detail: 'ghcr.io/testcontainers/ryuk:0.7 (registry not on allow-list)' } }],
+    ask: [/ghcr|ryuk|testcontainers|registry|allow/i, 'Platform: ryuk is the Testcontainers cleanup helper. ghcr.io is fine, we just never added it to the allow-list.'],
+    why: 'A well-known test helper from GitHub’s own registry. The policy gap is the real finding: ask platform to add ghcr.io to the allow-list or pin the digest.',
+    hints: ['What is the image and who publishes it?'] },
+  { id: 'Q804', title: 'EDR: curl piped to bash on a developer laptop', sev: 'high', src: 'EDR', ent: 'DEV-LAP-02', at: hm(12, 0), sla: m(45),
+    rule: 'Download piped straight into a shell.',
+    kv: [['Host', 'DEV-LAP-02 (kat.o)'], ['Command', 'curl … | bash'], ['Domain', 'get.docker.com']],
+    best: 'benign', alt: { it: 60, fp: 50 }, evText: 'The official Docker install script',
+    events: [{ src: 'edr', t: hm(11, 56, 9), f: { host: 'DEV-LAP-02', user: 'kat.o', proc: 'bash', parent: 'wsl.exe', cmd: 'curl -fsSL https://get.docker.com | bash', action: 'allowed', sig: 'signed' } }],
+    ti: ['get.docker.com', 'Docker official convenience-install host · reputation: CLEAN'],
+    phone: ['kat.o', 'Kat O.:\n"I was setting up Docker in WSL for the new service. I know, curl-pipe-bash, I should pin it."'],
+    why: 'It is the official Docker install script, run by the developer on her own laptop. The habit is risky, which is a coaching point, not an incident.',
+    hints: ['Look up the domain.'] },
+]

@@ -177,7 +177,7 @@ export const shift8: ShiftDef = {
   title: 'Fenwick Pay: the postinstall script',
   company: 'Fenwick Pay',
   level: 'Hard',
-  blurb: 'A hijacked dependency steals pipeline secrets and forges a signed release. Four alerts are routine developer activity. Production deploys at 11:40.',
+  blurb: 'A hijacked dependency steals pipeline secrets and forges a signed release. Plenty of the noise is routine developer activity. Production deploys at 11:40.',
   intro: 'You are the security analyst for Fenwick Pay, a fictional 120-person payments company, from 10:30 to 13:00. Source control, CI and the package registry are your sources. The release pipeline runs on a bot token that cannot be trusted any more once you find the theft.',
   start: hm(10, 30), end: hm(13, 0), dates: ['08-04', '08-05'],
   fields: FIELDS, srcdesc: SRCDESC, users: USERS, build, alerts: ALERTS, evd: EVD,

@@ -82,6 +82,14 @@ export interface Project {
   done: boolean[]
   completed: boolean
   completed_at: number | null
+  skips: SkipInfo
+}
+export interface SkipInfo {
+  rested: boolean
+  swaps_this_week: number
+  skipped_8: number
+  built_8: number
+  history: { week: string; title: string; mode: string; reason: string }[]
 }
 
 export interface Idea {
@@ -175,6 +183,8 @@ export const api = {
   deleteIdea: (id: number) => invoke<void>('delete_idea', { id }),
   project: () => invoke<Project | null>('get_project'),
   toggleStep: (step: number) => invoke<Project | null>('toggle_project_step', { step }),
+  skipProject: (mode: 'swap' | 'rest', reason: string) => invoke<Project | null>('skip_project', { mode, reason }),
+  unskipProject: () => invoke<Project | null>('unskip_project'),
   completeProject: (completed: boolean) => invoke<Project | null>('complete_project', { completed }),
   built: () => invoke<BuiltItem[]>('list_built'),
   glossary: () => invoke<GlossEntry[]>('get_glossary'),

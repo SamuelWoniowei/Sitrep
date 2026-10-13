@@ -1,0 +1,37 @@
+// Extra alerts for shift 10 (Corvid Managed Services, 09:30-12:00).
+import { hm, m } from '../common'
+import type { Noise } from '../noise'
+
+export const noise10: Noise[] = [
+  { id: 'Q1001', title: 'RMM: bulk script run on 40 endpoints', sev: 'med', src: 'RMM', ent: 'rmm-scheduler', at: hm(9, 50), sla: m(75),
+    rule: 'A script ran on more than 25 endpoints in 10 minutes.',
+    kv: [['Actor', 'rmm-scheduler'], ['Script', 'windows-update-check'], ['Count', '40']],
+    best: 'benign', alt: { fp: 60 }, evText: 'The scheduled Windows update check',
+    events: [{ src: 'rmm', t: hm(9, 45, 0), f: { actor: 'rmm-scheduler', op: 'run script', target: 'group:all-workstations', count: 40, detail: 'windows-update-check (scheduled, daily 09:45)' } }],
+    why: 'The scheduler’s own daily update check, in the same form every day. Compare it with the unscheduled script a stolen session pushed.',
+    hints: ['Who is the actor, and is the job scheduled?'] },
+  { id: 'Q1002', title: 'Entra ID: impossible travel for fi.n', sev: 'med', src: 'Entra ID', ent: 'fi.n', at: hm(10, 10), sla: m(75),
+    rule: 'Two sign-ins in 40 minutes from locations 700 km apart.',
+    kv: [['User', 'fi.n (Finance)'], ['Locations', 'Leeds and Dublin'], ['MFA', 'passed on both']],
+    best: 'benign', alt: { fp: 70 }, evText: 'The second sign-in from a mobile carrier address',
+    events: [{ src: 'entra', t: hm(10, 4, 9), f: { user: 'fi.n', ip: '198.51.100.58', geo: 'Dublin,IE', app: 'Outlook Mobile', dev: 'r08-phone', result: 'success', mfa: 'passed', ua: 'Outlook-iOS/4.2' } }],
+    phone: ['fi.n', 'Fi N.:\n"My phone sometimes shows up from Dublin because of the carrier. I am at my desk in Leeds."'],
+    why: 'The phone’s mobile carrier routes through Dublin, a known quirk. Same registered device, MFA passed on both.',
+    hints: ['Same device ID on both sign-ins? Phone the user.'] },
+  { id: 'Q1003', title: 'Vault: credential export by s.vance', sev: 'high', src: 'Client vault', ent: 's.vance', at: hm(10, 30), sla: m(45),
+    rule: 'Export of vault items outside a ticketed change.',
+    kv: [['Actor', 's.vance (Security)'], ['Items', '12'], ['Client', 'Harbour Dental']],
+    best: 'benign', alt: { it: 60, incident: -50 }, evText: 'The ticketed export for the client handover',
+    events: [{ src: 'vault', t: hm(10, 25, 11), f: { actor: 's.vance', op: 'export', items: 12, detail: 'client=Harbour Dental · reason: contract-end handover' } }],
+    ticket: ['chg-1044', 'CHG-1044 · Approved · Harbour Dental contract-end credential handover · security export 12 items, delivered to client in person.'],
+    why: 'A ticketed credential handover at contract end, by the security lead. Exports are always high severity, but this one has paperwork and a named client.',
+    hints: ['Is there a change record for this client?'] },
+  { id: 'Q1004', title: 'Proxy: visit to a newly registered domain', sev: 'low', src: 'Web proxy', ent: 'MKT-WS-01', at: hm(11, 0), sla: m(90),
+    rule: 'Request to a domain registered under 7 days ago.',
+    kv: [['User', 'kim.r (Marketing)'], ['Domain', 'summer-giveaway-uk.example'], ['Age', '5 days']],
+    best: 'it', alt: { benign: 60, incident: 40 }, evText: 'The visit to the lookalike prize site',
+    events: [{ src: 'proxy', t: hm(10, 56, 22), f: { user: 'kim.r', host: 'MKT-WS-01', src: '10.120.15.30', method: 'GET', domain: 'summer-giveaway-uk.example', url: '/claim?ref=staff', bytes_out: 420, cat: 'uncategorized', age: 5, action: 'allowed' } }],
+    ti: ['summer-giveaway-uk.example', 'Reputation: SUSPICIOUS · prize-scam kit · first seen 5 days ago · targets UK employers'],
+    why: 'A staff-targeted prize scam on a five-day-old domain. A single visit with no form submission is not a breach, but the domain should be blocked and the user warned, which is IT’s job rather than an incident.',
+    hints: ['Look the domain up. Did the user post anything to it?'] },
+]

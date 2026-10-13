@@ -18,14 +18,24 @@ const fmtDate = (ts: number) => new Date(ts * 1000).toLocaleDateString('en-GB', 
 export function ProjectPage() {
   const [p, setP, err] = useLoad<Project | null>(api.project)
   const [e2, setE2] = useState<string | null>(null)
+  const [skipOpen, setSkipOpen] = useState(false)
+  const [reason, setReason] = useState('none')
   if (err) return <div className="error">{err}</div>
   if (!p) return <div className="muted">Loading…</div>
   const run = (fn: () => Promise<Project | null>) => fn().then(setP).catch((e) => setE2(errText(e)))
+  const doSkip = (mode: 'swap' | 'rest') => run(() => api.skipProject(mode, reason)).then(() => { setSkipOpen(false); setReason('none') })
+  const sk = p.skips
   const allDone = p.done.every(Boolean)
   return (
     <section className="panel page">
-      <div className="mono small accent">PROJECT OF THE WEEK · {p.week}</div>
+      <div className="mono small accent">PROJECT OF THE WEEK · {p.week}{sk.rested ? ' · SKIPPED' : ''}</div>
       <h1 className="h1">{p.plan.title}</h1>
+      {sk.rested && (
+        <div className="note">
+          You skipped this week on purpose, and it's on the record. Nothing is lost: the steps are still here if you change your mind.{' '}
+          <button type="button" className="linkish" onClick={() => run(api.unskipProject)}>Undo skip</button>
+        </div>
+      )}
       <p className="muted">{p.plan.why}</p>
       <div className="dash">
       <div className="dash-main">
@@ -72,9 +82,38 @@ export function ProjectPage() {
           </button>
         )}
       </div>
+      {!p.completed && !sk.rested && (
+        <div className="card">
+          {!skipOpen ? (
+            <button type="button" className="btn" onClick={() => setSkipOpen(true)}>Not this one…</button>
+          ) : (
+            <div>
+              <div className="mono small muted">WHY? (OPTIONAL, JUST FOR YOUR OWN RECORD)</div>
+              <div className="chips" role="radiogroup" aria-label="Reason">
+                {([['too_big', 'Too big'], ['not_interested', 'Not interested'], ['no_time', 'No time this week'], ['avoiding', 'Honestly, avoiding it']] as const).map(([k, l]) => (
+                  <button type="button" key={k} role="radio" aria-checked={reason === k} className={`tag ${reason === k ? 'tag-green' : 'tag-grey'}`} onClick={() => setReason(reason === k ? 'none' : k)}>{l}</button>
+                ))}
+              </div>
+              <div className="actions">
+                <button type="button" className="btn btn-primary" onClick={() => doSkip('swap')}>Give me a different project</button>
+                <button type="button" className="btn" onClick={() => doSkip('rest')}>Skip this week entirely</button>
+                <button type="button" className="btn" onClick={() => setSkipOpen(false)}>Cancel</button>
+              </div>
+              {sk.swaps_this_week > 0 && <div className="tiny muted">Already swapped {sk.swaps_this_week}× this week.</div>}
+            </div>
+          )}
+        </div>
+      )}
+      {(sk.skipped_8 > 0 || sk.built_8 > 0) && (
+        <div className="small muted">
+          Last 8 weeks: <b>{sk.built_8}</b> built, <b>{sk.skipped_8}</b> with a skip.
+          {sk.skipped_8 >= 3 && sk.built_8 === 0 ? ' Three or more skips and nothing built is worth a look: if the size is the problem, do only step one.' : ''}
+          {sk.history.length > 0 && <> Recent: {sk.history.slice(0, 3).map((h) => `${h.title}${h.reason !== 'none' ? ` (${h.reason.replace('_', ' ')})` : ''}`).join('; ')}.</>}
+        </div>
+      )}
       {p.completed && <div className="accent small">Built. It's on your Built list and counts toward your skills radar.</div>}
       {e2 && <div className="error">{e2}</div>}
-      <p className="muted tiny">A new project is compiled from each week's news every Monday. Unfinished ones simply stay in the past: no guilt pile.</p>
+      <p className="muted tiny">A new project is compiled from each week's news every Monday. Unfinished or skipped ones simply stay in the past: no guilt pile, just an honest record.</p>
     </section>
   )
 }

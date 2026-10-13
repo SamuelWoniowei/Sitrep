@@ -187,7 +187,7 @@ export const shift7: ShiftDef = {
   company: 'Orchard Health Trust',
   level: 'Hard',
   blurb: 'A web shell on the patient portal, a credential dump and a hop to the app tier. Loud scanners and routine admin work hide the quiet attack.',
-  intro: 'You are the analyst covering Orchard Health Trust, a fictional group of clinics, from 10:00 to 12:30. Eight alerts are queued. The loudest are not the dangerous ones. Patient data sits behind the portal, and something is queued for 10:50.',
+  intro: 'You are the analyst covering Orchard Health Trust, a fictional group of clinics, from 10:00 to 12:30. The queue is already full. The loudest are not the dangerous ones. Patient data sits behind the portal, and something is queued for 10:50.',
   start: hm(10, 0), end: hm(12, 30), dates: ['07-20', '07-21'],
   fields: FIELDS, srcdesc: SRCDESC, users: USERS, build, alerts: ALERTS, evd: EVD,
   intel: { ti: TI, whois: {}, phone: PHONE, badge: {}, hr: HR, tickets: TICKET, askIt: askIT, protectedIps: { [OFFICE]: 'this is the office egress address. All clinics lose internet access.', [WEB_IP]: 'this is the patient portal. Patients can no longer book appointments.' } },

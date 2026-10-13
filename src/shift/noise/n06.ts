@@ -1,0 +1,38 @@
+// Extra alerts for shift 6 (Brightwell Cloud Labs, 13:00-15:00).
+import { hm, m } from '../common'
+import type { Noise } from '../noise'
+
+export const noise6: Noise[] = [
+  { id: 'Q601', title: 'CloudTrail: security group opened to 0.0.0.0/0', sev: 'high', src: 'CloudTrail', ent: 'sg-0staging', at: hm(13, 15), sla: m(45),
+    rule: 'An ingress rule allowing the whole internet was added to a security group.',
+    kv: [['Actor', 'otis.h'], ['Group', 'sg-0staging (staging-web)'], ['Port', '443'], ['Environment', 'staging']],
+    best: 'it', alt: { benign: 60, incident: -30 }, evText: 'The staging rule opened for a demo',
+    events: [{ src: 'cloudtrail', t: hm(13, 10, 33), f: { actor: 'otis.h', ip: '203.0.113.70', region: 'eu-west-2', op: 'AuthorizeSecurityGroupIngress', detail: 'sg-0staging tcp/443 0.0.0.0/0 (staging-web)' } }],
+    ask: [/staging|demo|443|security group/i, 'IT: staging web is open for the customer demo this afternoon. It should be closed afterwards, nobody has booked that.'],
+    why: 'Port 443 on a staging web tier for a booked customer demo, from the office. Not an attack, but a rule that will stay open unless someone owns closing it, so it goes to engineering/IT with a deadline.',
+    hints: ['Which environment? Is the actor at the office?'] },
+  { id: 'Q602', title: 'GitHub: new deploy key added to the infra repo', sev: 'med', src: 'GitHub', ent: 'infra', at: hm(13, 35), sla: m(90),
+    rule: 'A deploy key with write access was added to a repository.',
+    kv: [['User', 'sam.k (DevOps)'], ['Repo', 'infra'], ['Key', 'ci-runner-2 (write)']],
+    best: 'benign', alt: { it: 60, fp: 50 }, evText: 'The deploy key added by the DevOps owner',
+    events: [{ src: 'github', t: hm(13, 31, 20), f: { user: 'sam.k', repo: 'infra', event: 'deploy_key.create', detail: 'title=ci-runner-2 read_only=false' } }],
+    phone: ['sam.k', 'Sam K.:\n"Yes, that is the new CI runner I stood up today. I will make the key read-only once the pipeline works."'],
+    why: 'The repository owner added a key for a runner he built that morning. Write access is more than needed, but the action is his own.',
+    hints: ['Who added the key, and do they own that repo?'] },
+  { id: 'Q603', title: 'Billing: data transfer up 3x in eu-west-2', sev: 'low', src: 'Cloud billing', ent: 'eu-west-2', at: hm(13, 55), sla: m(120),
+    rule: 'Hourly spend more than 3x the 7-day baseline for a service.',
+    kv: [['Service', 'DataTransfer'], ['Region', 'eu-west-2'], ['Increase', '3.1x']],
+    best: 'benign', alt: { it: 70, fp: 60 }, evText: 'The data-transfer spike during the load test',
+    events: [{ src: 'billing', t: hm(13, 50, 0), f: { service: 'DataTransfer', region: 'eu-west-2', usd: 41.2, note: 'hourly 3.1x baseline' } }],
+    ask: [/load test|transfer|spike|billing/i, 'IT: engineering are running the quarterly load test from 13:30 to 14:30.'],
+    why: 'A scheduled load test explains the traffic and the cost. The attacker’s mining spike was in a different region and service.',
+    hints: ['Which service and region? Is a test running?'] },
+  { id: 'Q604', title: 'GuardDuty: port probe against an EC2 instance', sev: 'low', src: 'GuardDuty', ent: 'i-0web02', at: hm(14, 10), sla: m(120),
+    rule: 'Port-probe finding for an internet-facing instance.',
+    kv: [['Finding', 'Recon:EC2/PortProbeUnprotectedPort'], ['Resource', 'i-0web02'], ['Probe source', '192.0.2.141']],
+    best: 'benign', alt: { fp: 70 }, evText: 'The unanswered probe from a known scanner',
+    events: [{ src: 'guardduty', t: hm(14, 6, 11), f: { finding: 'Recon:EC2/PortProbeUnprotectedPort', resource: 'i-0web02', detail: 'probe from 192.0.2.141, 1 port, no response' } }],
+    ti: ['192.0.2.141', 'Internet-wide research scanner · seen at thousands of sites · no abuse history beyond scanning'],
+    why: 'A research scanner probing one port that returned nothing. Every internet-facing server sees this daily.',
+    hints: ['Look the address up with ti.'] },
+]

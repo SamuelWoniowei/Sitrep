@@ -219,7 +219,7 @@ export const shift9: ShiftDef = {
   company: 'Halden Energy',
   level: 'Expert',
   blurb: 'A dormant contractor account, Kerberoasting, DCSync and a ten-year ticket. Normal domain-controller traffic looks identical to the attack. Two deadlines.',
-  intro: 'You are the senior analyst at Halden Energy, a fictional regional power utility, from 08:00 to 11:00. Eleven alerts. The attacker has been inside since last night. Two things will happen on a clock, and one wrong isolation can take authentication down for the whole company.',
+  intro: 'You are the senior analyst at Halden Energy, a fictional regional power utility, from 08:00 to 11:00. The queue is long. The attacker has been inside since last night. Two things will happen on a clock, and one wrong isolation can take authentication down for the whole company.',
   start: hm(8, 0), end: hm(11, 0), dates: ['09-14', '09-15'],
   fields: FIELDS, srcdesc: SRCDESC, users: USERS, build, alerts: ALERTS, evd: EVD,
   intel: { ti: TI, whois: WHOIS, phone: PHONE, badge: {}, hr: HR, tickets: TICKET, askIt: askIT, protectedIps: { [OFFICE]: 'this is the corporate egress address. Control-room staff lose access to corporate systems.' } },

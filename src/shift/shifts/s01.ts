@@ -319,7 +319,7 @@ export const shift1: ShiftDef = {
   title: 'Harlow & Finch: the invoice that was not',
   company: 'Harlow & Finch Logistics',
   level: 'Medium',
-  blurb: 'Business email compromise through MFA fatigue. Three alerts are one incident, three are noise, one is a judgment call.',
+  blurb: 'Business email compromise through MFA fatigue, in a queue full of routine finance-team noise.',
   intro:
     'You are the only analyst on the morning shift at Harlow & Finch Logistics, a fictional 420-person freight company, from 08:30 to 11:00. Nobody will tell you which alerts matter. The rules are noisy, the logs look real, and some of what looks scary is routine.',
   start: hm(8, 30),

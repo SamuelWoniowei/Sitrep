@@ -368,11 +368,80 @@ pub struct ProjectView {
     pub done: Vec<bool>,
     pub completed: bool,
     pub completed_at: Option<i64>,
+    pub skips: SkipInfo,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct SkipItem {
+    pub week: String,
+    pub title: String,
+    pub mode: String,
+    pub reason: String,
+}
+
+/// An honest record of skipped projects, so avoiding shows up as a pattern
+/// rather than hiding.
+#[derive(Serialize, Clone, Debug)]
+pub struct SkipInfo {
+    pub rested: bool,
+    pub swaps_this_week: u32,
+    pub skipped_8: u32,
+    pub built_8: u32,
+    pub history: Vec<SkipItem>,
+}
+
+pub const SKIP_REASONS: &[&str] = &["too_big", "not_interested", "no_time", "avoiding", "none"];
+
+fn skip_info(store: &Store, week: &str, now: i64) -> SkipInfo {
+    let recent: Vec<String> = (0..8).map(|k| week_key(now - k * 7 * DAY)).collect();
+    let all = store.skips(200).unwrap_or_default();
+    let mut weeks: Vec<&str> = all
+        .iter()
+        .map(|r| r.0.as_str())
+        .filter(|w| recent.iter().any(|x| x == w))
+        .collect();
+    weeks.sort();
+    weeks.dedup();
+    let built_8 = store
+        .completed_projects()
+        .unwrap_or_default()
+        .iter()
+        .filter(|(w, _, _)| recent.iter().any(|x| x == w))
+        .count() as u32;
+    SkipInfo {
+        rested: store.week_rested(week).unwrap_or(false),
+        swaps_this_week: all.iter().filter(|r| r.0 == week && r.2 == "swap").count() as u32,
+        skipped_8: weeks.len() as u32,
+        built_8,
+        history: all
+            .into_iter()
+            .take(6)
+            .map(|(week, title, mode, reason, _)| SkipItem {
+                week,
+                title,
+                mode,
+                reason,
+            })
+            .collect(),
+    }
 }
 
 pub fn week_theme(store: &Store, now: i64) -> (Theme, usize) {
+    week_theme_excluding(store, now, &[])
+}
+
+/// Like `week_theme`, but never picks a theme in `skip` (unless every theme
+/// has been skipped, in which case the exclusion is ignored).
+pub fn week_theme_excluding(store: &Store, now: i64, skip: &[Theme]) -> (Theme, usize) {
     let stories = store.stories_since(now - 7 * DAY).unwrap_or_default();
-    let mut counts: Vec<(Theme, usize)> = ALL_THEMES.iter().map(|t| (*t, 0)).collect();
+    let mut counts: Vec<(Theme, usize)> = ALL_THEMES
+        .iter()
+        .filter(|t| !skip.contains(t))
+        .map(|t| (*t, 0))
+        .collect();
+    if counts.is_empty() {
+        counts = ALL_THEMES.iter().map(|t| (*t, 0)).collect();
+    }
     for s in &stories {
         for t in themes_of(&text_of(s)) {
             if let Some(c) = counts.iter_mut().find(|(x, _)| *x == t) {
@@ -411,7 +480,13 @@ pub fn project_saved(store: &Store, now: i64) -> Option<ProjectView> {
 fn project_inner(store: &Store, now: i64, persist: bool) -> Option<ProjectView> {
     let week = week_key(now);
     if store.project(&week).ok()?.is_none() {
-        let (theme, n) = week_theme(store, now);
+        let skipped: Vec<Theme> = store
+            .week_skip_themes(&week)
+            .unwrap_or_default()
+            .iter()
+            .filter_map(|k| Theme::from_key(k))
+            .collect();
+        let (theme, n) = week_theme_excluding(store, now, &skipped);
         let mut plan = project_for(theme, n);
         if n == 0 {
             plan.why =
@@ -424,9 +499,11 @@ fn project_inner(store: &Store, now: i64, persist: bool) -> Option<ProjectView> 
             .unwrap_or(0)
             >= MIN_STORIES_FOR_PROJECT;
         if !(persist || enough) {
+            let skips = skip_info(store, &week, now);
             return Some(ProjectView {
                 week,
                 resources: themes::resources_for(&plan.theme),
+                skips,
                 plan,
                 done,
                 completed: false,
@@ -443,14 +520,63 @@ fn project_inner(store: &Store, now: i64, persist: bool) -> Option<ProjectView> 
     }
     let (plan, done, completed, completed_at) = store.project(&week).ok()??;
     let plan: themes::ProjectPlan = serde_json::from_str(&plan).ok()?;
+    let skips = skip_info(store, &week, now);
     Some(ProjectView {
         week,
         resources: themes::resources_for(&plan.theme),
+        skips,
         plan,
         done: serde_json::from_str(&done).ok()?,
         completed,
         completed_at,
     })
+}
+
+/// Skip the week's project. `swap` replaces it with a different theme's
+/// project; `rest` keeps it but marks the week as deliberately skipped. Both
+/// are recorded with a reason from a fixed list. A built project can't be skipped.
+pub fn skip_project(
+    store: &Store,
+    now: i64,
+    mode: &str,
+    reason: &str,
+) -> Result<Option<ProjectView>, String> {
+    if mode != "swap" && mode != "rest" {
+        return Err("unknown skip mode".into());
+    }
+    if !SKIP_REASONS.contains(&reason) {
+        return Err("unknown reason".into());
+    }
+    let cur = project_saved(store, now).ok_or("no project this week")?;
+    if cur.completed {
+        return Err("This project is already built.".into());
+    }
+    if mode == "rest" && cur.skips.rested {
+        return Ok(Some(cur));
+    }
+    store
+        .add_skip(
+            &cur.week,
+            &cur.plan.theme,
+            &cur.plan.title,
+            mode,
+            reason,
+            now,
+        )
+        .map_err(|e| e.to_string())?;
+    if mode == "swap" {
+        store
+            .drop_unfinished_project(&cur.week)
+            .map_err(|e| e.to_string())?;
+        return Ok(project_saved(store, now));
+    }
+    Ok(project(store, now))
+}
+
+/// Undo a "skip this week".
+pub fn unrest_project(store: &Store, now: i64) -> Option<ProjectView> {
+    let _ = store.clear_rest(&week_key(now));
+    project(store, now)
 }
 
 pub fn toggle_step(store: &Store, now: i64, step: usize) -> Option<ProjectView> {
@@ -805,6 +931,47 @@ mod tests {
         s.complete_project(&p.week, true, NOW).unwrap();
         assert_eq!(built(&s).len(), 1);
         assert!(radar(&s, NOW).iter().any(|r| r.built));
+    }
+
+    #[test]
+    fn skipping_swaps_the_theme_and_is_recorded() {
+        let s = seeded();
+        let first = project(&s, NOW).unwrap();
+        let swapped = skip_project(&s, NOW, "swap", "too_big").unwrap().unwrap();
+        assert_ne!(swapped.plan.theme, first.plan.theme);
+        assert_eq!(swapped.skips.swaps_this_week, 1);
+        assert_eq!(swapped.skips.skipped_8, 1);
+        assert_eq!(swapped.skips.history[0].reason, "too_big");
+        assert!(!swapped.skips.rested);
+        // The new one is locked in and stable across calls.
+        assert_eq!(project(&s, NOW).unwrap().plan.theme, swapped.plan.theme);
+        // Swapping again never returns a theme already skipped this week.
+        let third = skip_project(&s, NOW, "swap", "avoiding").unwrap().unwrap();
+        assert!(![first.plan.theme.clone(), swapped.plan.theme.clone()].contains(&third.plan.theme));
+    }
+
+    #[test]
+    fn resting_a_week_keeps_the_project_and_can_be_undone() {
+        let s = seeded();
+        let p = project(&s, NOW).unwrap();
+        let r = skip_project(&s, NOW, "rest", "no_time").unwrap().unwrap();
+        assert!(r.skips.rested);
+        assert_eq!(r.plan.title, p.plan.title);
+        assert_eq!(r.skips.skipped_8, 1);
+        let back = unrest_project(&s, NOW).unwrap();
+        assert!(!back.skips.rested);
+        assert_eq!(back.skips.skipped_8, 0);
+    }
+
+    #[test]
+    fn skip_rejects_bad_input_and_built_projects() {
+        let s = seeded();
+        assert!(skip_project(&s, NOW, "delete", "none").is_err());
+        assert!(skip_project(&s, NOW, "swap", "<script>").is_err());
+        let p = project_saved(&s, NOW).unwrap();
+        s.complete_project(&p.week, true, NOW).unwrap();
+        assert!(skip_project(&s, NOW, "swap", "none").is_err());
+        assert_eq!(project(&s, NOW).unwrap().skips.built_8, 1);
     }
 
     #[test]

@@ -19,6 +19,9 @@ pub type ProjectRow = (String, String, bool, Option<i64>);
 /// (term, options JSON, answer index, chosen index)
 pub type QuizRow = (String, String, i64, Option<i64>);
 
+/// (week, title, mode, reason, at)
+pub type SkipRow = (String, String, String, String, i64);
+
 pub struct Store {
     pub conn: Connection,
 }
@@ -103,6 +106,9 @@ impl Store {
              CREATE TABLE IF NOT EXISTS projects(
                week TEXT PRIMARY KEY, plan TEXT NOT NULL, done TEXT NOT NULL,
                completed INTEGER NOT NULL DEFAULT 0, completed_at INTEGER);
+             CREATE TABLE IF NOT EXISTS project_skips(
+               id INTEGER PRIMARY KEY AUTOINCREMENT, week TEXT NOT NULL, theme TEXT NOT NULL,
+               title TEXT NOT NULL, mode TEXT NOT NULL, reason TEXT NOT NULL, at INTEGER NOT NULL);
              CREATE TABLE IF NOT EXISTS watchlist(term TEXT PRIMARY KEY);
              CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
              CREATE TABLE IF NOT EXISTS cvss(cve TEXT PRIMARY KEY, score REAL NOT NULL, severity TEXT NOT NULL, fetched INTEGER NOT NULL);
@@ -684,6 +690,63 @@ impl Store {
             ))
         })?;
         rows.collect()
+    }
+
+    // ---------- project skips ----------
+    pub fn add_skip(
+        &self,
+        week: &str,
+        theme: &str,
+        title: &str,
+        mode: &str,
+        reason: &str,
+        now: i64,
+    ) -> rusqlite::Result<()> {
+        self.conn.execute(
+            "INSERT INTO project_skips(week,theme,title,mode,reason,at) VALUES(?1,?2,?3,?4,?5,?6)",
+            params![week, theme, title, mode, reason, now],
+        )?;
+        Ok(())
+    }
+    /// Newest first: (week, title, mode, reason, at).
+    pub fn skips(&self, limit: i64) -> rusqlite::Result<Vec<SkipRow>> {
+        let mut st = self.conn.prepare(
+            "SELECT week,title,mode,reason,at FROM project_skips ORDER BY id DESC LIMIT ?1",
+        )?;
+        let rows = st.query_map(params![limit], |r| {
+            Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?))
+        })?;
+        rows.collect()
+    }
+    pub fn week_skip_themes(&self, week: &str) -> rusqlite::Result<Vec<String>> {
+        let mut st = self
+            .conn
+            .prepare("SELECT DISTINCT theme FROM project_skips WHERE week=?1")?;
+        let rows = st.query_map(params![week], |r| r.get(0))?;
+        rows.collect()
+    }
+    pub fn week_rested(&self, week: &str) -> rusqlite::Result<bool> {
+        self.conn
+            .query_row(
+                "SELECT COUNT(*) FROM project_skips WHERE week=?1 AND mode='rest'",
+                params![week],
+                |r| r.get::<_, i64>(0),
+            )
+            .map(|n| n > 0)
+    }
+    pub fn clear_rest(&self, week: &str) -> rusqlite::Result<usize> {
+        self.conn.execute(
+            "DELETE FROM project_skips WHERE week=?1 AND mode='rest'",
+            params![week],
+        )
+    }
+    /// Drop this week's project so a different one can be chosen. A built
+    /// project is never removed.
+    pub fn drop_unfinished_project(&self, week: &str) -> rusqlite::Result<usize> {
+        self.conn.execute(
+            "DELETE FROM projects WHERE week=?1 AND completed=0",
+            params![week],
+        )
     }
 
     // ---------- watchlist ----------

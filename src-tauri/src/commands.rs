@@ -583,6 +583,20 @@ pub fn complete_project(state: State<'_, AppState>, completed: bool) -> Res<Opti
     Ok(core::project(&s, t))
 }
 #[tauri::command]
+pub fn skip_project(
+    state: State<'_, AppState>,
+    mode: String,
+    reason: String,
+) -> Res<Option<ProjectView>> {
+    let s = lock(&state)?;
+    core::skip_project(&s, now(), &mode, &reason)
+}
+#[tauri::command]
+pub fn unskip_project(state: State<'_, AppState>) -> Res<Option<ProjectView>> {
+    let s = lock(&state)?;
+    Ok(core::unrest_project(&s, now()))
+}
+#[tauri::command]
 pub fn list_built(state: State<'_, AppState>) -> Res<Vec<BuiltItem>> {
     let s = lock(&state)?;
     Ok(core::built(&s))

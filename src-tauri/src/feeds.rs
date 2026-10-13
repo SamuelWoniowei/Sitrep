@@ -191,7 +191,10 @@ mod tests {
 
     #[test]
     fn general_news_feeds_keep_only_security_stories() {
-        let bbc = Source { cyber_only: true, ..SRC };
+        let bbc = Source {
+            cyber_only: true,
+            ..SRC
+        };
         let bytes = rss(
             r#"<item><title>Hackers take over thousands of smart fridges in France</title><link>https://www.bbc.co.uk/news/a</link></item>
             <item><title>New phone launch draws crowds</title><link>https://www.bbc.co.uk/news/b</link></item>

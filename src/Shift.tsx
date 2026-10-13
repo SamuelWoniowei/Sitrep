@@ -169,7 +169,7 @@ export function ShiftPage({ aiReady }: { aiReady: boolean }) {
             return (
               <button type="button" key={d.id} role="radio" aria-checked={def.id === d.id} className={`sh-mode ${def.id === d.id ? 'sh-mode-on' : ''}`} onClick={() => setDef(d)}>
                 <b>{d.title}</b>
-                <span className="tiny mono accent">{d.level.toUpperCase()} · {d.company} · {fmt(d.start)}–{fmt(d.end)} · {d.alerts.filter((a) => !a.late).length}+ alerts</span>
+                <span className="tiny mono accent">{d.level.toUpperCase()} · {d.company} · {fmt(d.start)}–{fmt(d.end)}</span>
                 <span className="small muted">{d.blurb}</span>
                 {r && <span className="tiny muted">Best {r.best} of {r.max} · played {r.plays}×</span>}
               </button>

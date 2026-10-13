@@ -63,6 +63,8 @@ pub fn run() {
             commands::get_project,
             commands::toggle_project_step,
             commands::complete_project,
+            commands::skip_project,
+            commands::unskip_project,
             commands::list_built,
             commands::get_glossary,
             commands::set_term_status,

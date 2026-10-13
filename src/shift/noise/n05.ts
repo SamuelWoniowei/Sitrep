@@ -1,0 +1,36 @@
+// Extra alerts for shift 5 (Marlowe Architects, 09:00-11:00).
+import { hm, m } from '../common'
+import type { Noise } from '../noise'
+
+export const noise5: Noise[] = [
+  { id: 'Q501', title: 'File audit: 900 files read by tariq.b', sev: 'med', src: 'File audit', ent: 'ARCH-WS-02', at: hm(9, 25), sla: m(90),
+    rule: 'One user opened more than 500 files in 10 minutes.',
+    kv: [['User', 'tariq.b (Design)'], ['Share', '\\\\FILES\\Projects\\Quay'], ['Files', '~900'], ['Writes', '0']],
+    best: 'benign', alt: { fp: 60 }, evText: 'The read-only sweep of the Quay project',
+    events: [{ src: 'fileaudit', t: hm(9, 21, 15), f: { user: 'tariq.b', host: 'ARCH-WS-02', op: 'read', path: '\\\\FILES\\Projects\\Quay\\Drawings', size: 2400 } }],
+    ask: [/quay|tariq|render|archive|migrat/i, 'IT: Tariq is rendering the Quay planning pack this morning. The renderer opens every drawing in the folder.'],
+    why: 'Reads only, in his own project folder, while rendering a planning pack. A leaver copying other clients’ files would be reading folders he never touches.',
+    hints: ['Is this his project? Were any files copied, or only read?'] },
+  { id: 'Q502', title: 'VPN: login from abroad for lola.e', sev: 'low', src: 'VPN', ent: 'lola.e', at: hm(9, 40), sla: m(120),
+    rule: 'VPN login from a country other than the UK.',
+    kv: [['User', 'lola.e (Design)'], ['Source', '198.51.100.88'], ['Location', 'Lisbon, PT'], ['Result', 'success']],
+    best: 'benign', alt: { fp: 60 }, evText: 'The VPN login from Lisbon',
+    events: [{ src: 'vpn', t: hm(9, 36, 50), f: { ip: '198.51.100.88', user: 'lola.e', result: 'success', reason: 'ok' } }],
+    hr: ['lola.e', 'Architectural assistant · APPROVED annual leave this week · working remotely from Lisbon on Wednesday (agreed with her manager).'],
+    why: 'HR shows an approved remote-working day in Lisbon. The location made the rule fire; the person explains it.',
+    hints: ['Check HR for this user.'] },
+  { id: 'Q503', title: 'Mail: attachment sent to a personal address', sev: 'med', src: 'Mail / DLP', ent: 'ruth.g', at: hm(10, 5), sla: m(90),
+    rule: 'Outbound message with a project file to a free-mail address.',
+    kv: [['User', 'ruth.g (Admin)'], ['Recipient', 'ruth.green.home@mailbox.example'], ['Attachment', 'rota_week42.xlsx']],
+    best: 'benign', alt: { fp: 70 }, evText: 'The staff rota sent to her own home address',
+    events: [{ src: 'mail', t: hm(10, 1, 4), f: { sender: 'ruth.g@marlowearch.example', rcpt: 'ruth.green.home@mailbox.example', subj: 'Rota', att: 'rota_week42.xlsx', url: '-', dir: 'outbound', verdict: 'delivered' } }],
+    why: 'The attachment is the staff rota, not a client drawing, sent to the same person’s home address. Worth a policy reminder, not a case.',
+    hints: ['What is the attachment, and who is the recipient?'] },
+  { id: 'Q504', title: 'USB: personal phone mounted on ARCH-WS-04', sev: 'low', src: 'Device control', ent: 'ARCH-WS-04', at: hm(10, 20), sla: m(120),
+    rule: 'Phone connected as a storage device.',
+    kv: [['Host', 'ARCH-WS-04 (lola.e)'], ['Device', 'Pixel phone'], ['Action', 'charge only']],
+    best: 'fp', alt: { benign: 80 }, evText: 'The phone connected in charge-only mode',
+    events: [{ src: 'usb', t: hm(10, 16, 40), f: { host: 'ARCH-WS-04', user: 'lola.e', drive: '-', vendor: 'Google Pixel', action: 'charge only, no data transfer' } }],
+    why: 'The phone only charged. The rule fired on the USB connection but no storage was mounted and nothing was copied.',
+    hints: ['Was any storage actually mounted?'] },
+]

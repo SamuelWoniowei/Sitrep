@@ -1,0 +1,38 @@
+// Extra alerts for shift 7 (Orchard Health Trust, 10:00-12:30).
+import { hm, m } from '../common'
+import type { Noise } from '../noise'
+
+export const noise7: Noise[] = [
+  { id: 'Q701', title: 'Windows: 9 failed logons for nurse.lead', sev: 'low', src: 'Windows Security', ent: 'CLIN-WS-01', at: hm(10, 20), sla: m(90),
+    rule: 'Eight or more failed logons for one account in 10 minutes.',
+    kv: [['User', 'nurse.lead'], ['Host', 'CLIN-WS-01'], ['Source', 'local console'], ['Then', 'success']],
+    best: 'benign', alt: { fp: 60 }, evText: 'The failures at the ward console, then a success',
+    events: [{ src: 'winsec', t: hm(10, 14, 5), f: { host: 'CLIN-WS-01', user: 'nurse.lead', event: '4625', src: 'local', detail: 'bad password, console' } },
+      { src: 'winsec', t: hm(10, 17, 40), f: { host: 'CLIN-WS-01', user: 'nurse.lead', event: '4624', src: 'local', detail: 'type=2 interactive' } }],
+    why: 'A ward nurse mistyping after the monthly password change, at her own console, then a normal logon. A spray would not come from a single local console.',
+    hints: ['Was it local or remote? Did it end in a success from the same place?'] },
+  { id: 'Q702', title: 'Firewall: DNS tunnelling signature from the guest Wi-Fi', sev: 'med', src: 'Firewall', ent: '10.99.4.18', at: hm(10, 35), sla: m(60),
+    rule: 'High-entropy DNS queries from a single client.',
+    kv: [['Client', '10.99.4.18 (guest Wi-Fi)'], ['Queries', '1,200 in 10 min'], ['Resolver', 'external']],
+    best: 'benign', alt: { it: 70, fp: 60 }, evText: 'The guest-network client making long DNS queries',
+    events: [{ src: 'fw', t: hm(10, 28, 44), f: { src: '10.99.4.18', dst: '203.0.113.53', port: 53, action: 'allow', bytes: 3100 } }],
+    ask: [/guest|wi-?fi|dns|10\.99/i, 'IT: 10.99.0.0/16 is the guest and patient Wi-Fi, fully separate from the clinical network. A phone doing app updates looks like this.'],
+    why: 'The client is on the guest Wi-Fi, which is isolated from clinical systems. A phone or tablet making many long DNS lookups looks like tunnelling but is app traffic.',
+    hints: ['Which network is 10.99.x.x? Try ask-it.'] },
+  { id: 'Q703', title: 'EDR: unsigned tool run by dba.nair', sev: 'med', src: 'EDR', ent: 'ADM-WS-02', at: hm(11, 0), sla: m(75),
+    rule: 'Unsigned binary launched from a user profile.',
+    kv: [['Host', 'ADM-WS-02 (dba.nair)'], ['File', 'sqlcmd-helper.exe'], ['Signature', 'unsigned']],
+    best: 'benign', alt: { it: 60, fp: 50 }, evText: 'The DBA’s own helper tool',
+    events: [{ src: 'edr', t: hm(10, 56, 18), f: { host: 'ADM-WS-02', user: 'dba.nair', proc: 'sqlcmd-helper.exe', parent: 'powershell.exe', cmd: 'sqlcmd-helper.exe --report weekly', action: 'allowed', sig: 'unsigned' } }],
+    phone: ['dba.nair', 'DBA Nair:\n"That is my own script wrapper for the weekly report, I compile it myself. It has been there for a year."'],
+    why: 'A self-built reporting helper the DBA has used for a year, running a weekly report. Unsigned and home-made, so tell IT to sign or retire it, but it is not malicious.',
+    hints: ['Who runs it, and how long has it existed?'] },
+  { id: 'Q704', title: 'Web: 70 requests to /robots.txt and /sitemap.xml', sev: 'low', src: 'Web server', ent: '203.0.113.150', at: hm(11, 25), sla: m(120),
+    rule: 'High request rate to non-application paths.',
+    kv: [['Source', '203.0.113.150'], ['Paths', '/robots.txt, /sitemap.xml'], ['Status', '200/404']],
+    best: 'benign', alt: { fp: 70 }, evText: 'The search-engine crawler',
+    events: [{ src: 'web', t: hm(11, 20, 2), f: { src: '203.0.113.150', method: 'GET', path: '/robots.txt', status: 200, ua: 'Googlebot/2.1 (+http://www.google.com/bot.html)', bytes: 210, waf: '-' } }],
+    ti: ['203.0.113.150', 'Search-engine crawler range · verified reverse DNS crawl-*.search.example'],
+    why: 'A verified search-engine crawler reading robots.txt and the sitemap. Check the user agent and the address before panicking.',
+    hints: ['Look at the user agent and look the IP up.'] },
+]
