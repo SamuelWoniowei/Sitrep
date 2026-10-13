@@ -155,7 +155,7 @@ News comes from BleepingComputer, The Record, The Hacker News, the UK NCSC, the 
 - Stories that led an earlier day's brief no longer lead today's brief unless nothing fresher exists.
 - **More news**: Today now lists the 15 newest stories that aren't in the brief, newest first. They open the original article in your browser.
 
-## v0.5.4 (includes the v0.5.2 and v0.5.3 changes)
+## v0.5.5 (includes the v0.5.2 to v0.5.4 changes)
 
 - **Ten SOC shifts**, from Starter to Expert, picked on the SOC shift page. Each is a different fictional company and a different attack, with its own logs, decoy alerts, people to phone and deadlines: a phished receptionist (Starter), a found USB stick (Starter), an exposed RDP port and ransomware (Easy), a leaver copying client files (Easy), the original business-email-compromise shift (Medium), a leaked cloud key (Medium), a web shell on a patient portal (Hard), a poisoned dependency in a CI pipeline (Hard), Kerberoasting to a golden ticket (Expert), and an authorised red team running alongside a real attack on a managed-service provider (Expert). Every shift can be solved (the tests play a scripted perfect run of each one) and blanket strategies like "escalate everything" score badly. Shifts are plain data files in `src/shift/shifts/`, so adding one is one file plus an id.
 - **Skip a project**: on Project of the week, "Not this one…" lets you swap in a different project or skip the week, with an optional reason (too big, not interested, no time, honestly avoiding it). Skips are kept as an honest record ("last 8 weeks: built X, skipped Y") so avoidance is visible rather than hidden. A built project can't be skipped.
