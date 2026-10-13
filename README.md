@@ -21,7 +21,7 @@ It's built for people who want to keep up with security without drowning in it, 
 - **Natural British voice (optional):** Piper "Alan", one verified download, then offline. Listen mode never uses online voices.
 - **Weekly project, idea backlog, quiz, recap, skills radar** (from v0.1).
 - **Motion on/off** and automatic reduced-motion support.
-- **Sources:** BleepingComputer, The Record, The Hacker News, NCSC UK, SANS ISC, CISA Advisories, Microsoft MSRC, Cisco Talos, Krebs on Security, CISA KEV, plus NVD severity scores.
+- **Sources:** BleepingComputer, The Record, The Hacker News, NCSC UK, SANS ISC, CISA Advisories, Microsoft MSRC, Cisco Talos, Krebs on Security, BBC News (technology feed, security stories only), CISA KEV, plus NVD severity scores.
 
 ## Privacy
 

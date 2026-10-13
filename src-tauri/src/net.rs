@@ -28,6 +28,8 @@ pub struct Source {
     pub url: &'static str,
     pub kind: FeedKind,
     pub uk: bool,
+    /// General-news feeds: keep only items that look security-related.
+    pub cyber_only: bool,
 }
 
 /// The only places Sitrep ever fetches from. Changing this list is a
@@ -39,6 +41,7 @@ pub const SOURCES: &[Source] = &[
         url: "https://www.bleepingcomputer.com/feed/",
         kind: FeedKind::Rss,
         uk: false,
+        cyber_only: false,
     },
     Source {
         id: "record",
@@ -46,6 +49,7 @@ pub const SOURCES: &[Source] = &[
         url: "https://therecord.media/feed",
         kind: FeedKind::Rss,
         uk: false,
+        cyber_only: false,
     },
     Source {
         id: "thn",
@@ -53,6 +57,7 @@ pub const SOURCES: &[Source] = &[
         url: "https://feeds.feedburner.com/TheHackersNews",
         kind: FeedKind::Rss,
         uk: false,
+        cyber_only: false,
     },
     Source {
         id: "ncsc",
@@ -60,6 +65,7 @@ pub const SOURCES: &[Source] = &[
         url: "https://www.ncsc.gov.uk/api/1/services/v1/news-rss-feed.xml",
         kind: FeedKind::Rss,
         uk: true,
+        cyber_only: false,
     },
     Source {
         id: "sans",
@@ -67,6 +73,7 @@ pub const SOURCES: &[Source] = &[
         url: "https://isc.sans.edu/rssfeed_full.xml",
         kind: FeedKind::Rss,
         uk: false,
+        cyber_only: false,
     },
     Source {
         id: "cisa_adv",
@@ -74,6 +81,7 @@ pub const SOURCES: &[Source] = &[
         url: "https://www.cisa.gov/cybersecurity-advisories/all.xml",
         kind: FeedKind::Rss,
         uk: false,
+        cyber_only: false,
     },
     Source {
         id: "msrc",
@@ -81,6 +89,7 @@ pub const SOURCES: &[Source] = &[
         url: "https://api.msrc.microsoft.com/update-guide/rss",
         kind: FeedKind::Rss,
         uk: false,
+        cyber_only: false,
     },
     Source {
         id: "talos",
@@ -88,6 +97,7 @@ pub const SOURCES: &[Source] = &[
         url: "https://blog.talosintelligence.com/rss/",
         kind: FeedKind::Rss,
         uk: false,
+        cyber_only: false,
     },
     Source {
         id: "krebs",
@@ -95,6 +105,15 @@ pub const SOURCES: &[Source] = &[
         url: "https://krebsonsecurity.com/feed/",
         kind: FeedKind::Rss,
         uk: false,
+        cyber_only: false,
+    },
+    Source {
+        id: "bbc",
+        name: "BBC News",
+        url: "https://feeds.bbci.co.uk/news/technology/rss.xml",
+        kind: FeedKind::Rss,
+        uk: false,
+        cyber_only: true,
     },
     Source {
         id: "kev",
@@ -102,6 +121,7 @@ pub const SOURCES: &[Source] = &[
         url: "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json",
         kind: FeedKind::KevJson,
         uk: false,
+        cyber_only: false,
     },
 ];
 
@@ -478,6 +498,7 @@ mod tests {
             url: "https://evil.example/feed",
             kind: FeedKind::Rss,
             uk: false,
+            cyber_only: false,
         };
         let err = fetch_source(&feed_client().unwrap(), &fake)
             .await

@@ -12,6 +12,12 @@ pub const MAX_ITEMS_PER_FEED: usize = 100;
 pub const MAX_TITLE: usize = 300;
 pub const MAX_SUMMARY: usize = 4000;
 
+/// BBC's technology feed is general news; only security stories are kept.
+static CYBER_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)\b(cyber|hack(s|er|ers|ed|ing)?|ransomware|malware|spyware|botnet|phishing|data (breach|leak|theft)|breach(ed|es)?|vulnerabilit|exploit(ed|s)?|ddos|zero-day|infostealer|stolen data|encryption|cybercrim)")
+        .expect("valid regex")
+});
+
 static CVE_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)\bCVE-(\d{4})-(\d{4,7})\b").unwrap());
 
@@ -78,6 +84,9 @@ pub fn parse_rss(bytes: &[u8], src: &Source, now: i64) -> Result<Vec<RawItem>, S
             .map(|d| d.timestamp())
             .unwrap_or(now)
             .min(now); // never trust future dates
+        if src.cyber_only && !CYBER_RE.is_match(&format!("{title} {summary}")) {
+            continue;
+        }
         let cves = extract_cves(&format!("{title} {summary}"));
         items.push(RawItem {
             title,
@@ -155,6 +164,7 @@ mod tests {
         url: "https://therecord.media/feed",
         kind: FeedKind::Rss,
         uk: false,
+        cyber_only: false,
     };
     const NOW: i64 = 1_800_000_000;
 
@@ -177,6 +187,21 @@ mod tests {
         assert_eq!(it.summary, "Attackers exploit it.");
         assert_eq!(it.cves, vec!["CVE-2026-12345"]);
         assert_eq!(it.link.as_deref(), Some("https://therecord.media/x"));
+    }
+
+    #[test]
+    fn general_news_feeds_keep_only_security_stories() {
+        let bbc = Source { cyber_only: true, ..SRC };
+        let bytes = rss(
+            r#"<item><title>Hackers take over thousands of smart fridges in France</title><link>https://www.bbc.co.uk/news/a</link></item>
+            <item><title>New phone launch draws crowds</title><link>https://www.bbc.co.uk/news/b</link></item>
+            <item><title>Shop chain confirms data breach</title><link>https://www.bbc.co.uk/news/c</link></item>
+            <item><title>Chip maker posts record sales</title><link>https://www.bbc.co.uk/news/d</link><description>Shares rose.</description></item>"#,
+        );
+        let kept = parse_rss(&bytes, &bbc, NOW).unwrap();
+        assert_eq!(kept.len(), 2);
+        assert!(kept[0].title.contains("fridges") && kept[1].title.contains("breach"));
+        assert_eq!(parse_rss(&bytes, &SRC, NOW).unwrap().len(), 4);
     }
 
     #[test]

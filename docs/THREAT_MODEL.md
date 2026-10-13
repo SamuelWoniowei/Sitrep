@@ -79,3 +79,4 @@ Sitrep is a single-user desktop app. It downloads public news feeds, stores them
 
 Changes to any of the following need an update to this document and the tests:
 the `SOURCES`, `ARTICLE_HOSTS` or `NVD_HOST` in `net.rs`, the pinned URLs and hashes in `voice.rs`, the cloud-model rule in `ai.rs`, the CSP in `tauri.conf.json`, `capabilities/`, any new Tauri command, or any change to how text is rendered in the UI.
+| T36 | **A general-news feed floods the briefing or widens the fetch list** | BBC News (technology feed, `feeds.bbci.co.uk`) is one more fixed HTTPS feed under the same allowlist, size, time and sanitising rules. It is marked `cyber_only`, so only items whose title or summary match security keywords are kept; the rest are dropped before storage. Full-article fetch is not enabled for it: links open in the browser only. | `net.rs`, `feeds.rs` |
